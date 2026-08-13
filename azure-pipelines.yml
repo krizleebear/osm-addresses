@@ -13,6 +13,9 @@
 # Stages:
 #   convert -- Per-region PBF -> Parquet conversion (Container-Job-Pattern)
 #   package -- Bundle all per-region Parquet files into a single archive
+trigger: none
+pr: none
+
 parameters:
 - name: skipOsmiumFilter
   displayName: 'Skip Osmium filtering (use pre-filtered addresses.pbf pipeline artifacts)'
