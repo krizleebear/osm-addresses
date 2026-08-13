@@ -853,8 +853,6 @@ stages:
           echo "[INFO] Converting filtered PBF to GeoParquet via DuckDB..."
           /app/entrypoint.sh "$FILTERED_PBF" "$OUTPUT_PARQUET"
 
-          rm -f "$FILTERED_PBF"
-
     - task: PublishPipelineArtifact@1
       enabled: true
       displayName: 'Publish pre-filtered address PBF artifact'
