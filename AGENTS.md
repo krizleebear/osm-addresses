@@ -21,8 +21,9 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
 
 1. **Azure DevOps Job Container Entrypoint Safety:**
    - Docker images intended for Azure DevOps job containers (`container: <image>`) must NOT define an exec-form `ENTRYPOINT` that exits on unknown arguments (such as `ENTRYPOINT ["/app/entrypoint.sh"]`), because Azure DevOps starts job containers with `sleep infinity`. Use `CMD ["/bin/bash"]` in the Dockerfile and invoke processing scripts explicitly in pipeline steps.
-2. **Immutable Container Image Digest Pinning:**
-   - In pipeline container resource definitions using `mirror.gcr.io`, reference images with immutable digests (`image: mirror.gcr.io/owner/repo@sha256:...`) rather than mutable tags (`:latest` or version tags) to prevent stale cache hits on runners.
+2. **Immutable Container Image Digest Pinning & Buildx Provenance Invariant:**
+   - In pipeline container resource definitions using `mirror.gcr.io`, reference images with immutable digests (`image: mirror.gcr.io/owner/repo@sha256:...`) rather than mutable tags.
+   - **Crucial**: Container images pushed to Docker Hub for `mirror.gcr.io` consumption MUST be built with `docker buildx build --provenance=false ...`. Modern buildx default OCI attestation/provenance manifests fail on `mirror.gcr.io` with `unknown blob` 404 errors.
 3. **DuckDB Script Template Substitution Invariant:**
    - DuckDB `COPY ... TO` statements require string literal paths. Do not attempt `getvariable()` inside `COPY TO`. Use `sed` token substitution (`__INPUT_PBF__`, `__OUTPUT_PARQUET__`) on SQL templates before piping into `duckdb`.
 4. **Conventional Commits:**
