@@ -784,7 +784,7 @@ stages:
         project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
         definition: '3'
         buildVersionToDownload: 'latest'
-        itemPattern: 'osm-data-$(OSM_REGION)/$(OSM_REGION).osm.pbf'
+        artifactName: 'osm-data-$(OSM_REGION)'
         targetPath: '$(System.DefaultWorkingDirectory)'
 
     # Download pre-filtered address PBF artifact when skipOsmiumFilter is true
