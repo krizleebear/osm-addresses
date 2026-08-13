@@ -25,10 +25,10 @@ resources:
   # Use mirror.gcr.io to prevent Docker Hub pull rate limits during parallel matrix execution.
   # Always reference an immutable digest (never a mutable tag like :latest) so the mirror
   # cache cannot serve a stale image. Update this digest after every image rebuild:
-  #   docker buildx imagetools inspect krizleebear/osm2parquet:v1.0.2 --format '{{json .Manifest.Digest}}'
+  #   docker buildx imagetools inspect krizleebear/osm2parquet:v1.0.3 --format '{{json .Manifest.Digest}}'
   - container: osm2parquet
-    # krizleebear/osm2parquet:v1.0.2
-    image: mirror.gcr.io/krizleebear/osm2parquet@sha256:b3da69345c016d46c9f073d27843632925d325b477d40c760195505d94e3ba26
+    # krizleebear/osm2parquet:v1.0.3
+    image: mirror.gcr.io/krizleebear/osm2parquet@sha256:8e32cb6453766773347db67b1e42eac0180beed8af35000fb4492649d6cc75dc
 
 # ---------------------------------------------------------------------------
 # Stage 1: Convert PBF -> GeoParquet (per region, parallel matrix)
@@ -100,6 +100,7 @@ stages:
           set -e
 
           INPUT_PBF="osm-data-$(OSM_REGION)/$(OSM_REGION).osm.pbf"
+          FILTERED_PBF="$(OSM_REGION).filtered.pbf"
           OUTPUT_PARQUET="$(COUNTRY_CODE)_$(OSM_REGION).addresses.parquet"
 
           if [ ! -f "$INPUT_PBF" ]; then
@@ -119,10 +120,17 @@ stages:
             exit 1
           fi
 
-          /app/entrypoint.sh "$INPUT_PBF" "$OUTPUT_PARQUET"
+          echo "[INFO] Step 1: Filter address-tagged features via osmium..."
+          osmium tags-filter "$INPUT_PBF" n/addr:housenumber wr/addr:housenumber -o "$FILTERED_PBF" --overwrite
 
-          # Reclaim disk space: remove heavy raw PBF immediately after conversion
+          echo "[INFO] Step 2: Reclaim disk space: removing raw input PBF immediately..."
           rm -rf "osm-data-$(OSM_REGION)"
+
+          echo "[INFO] Step 3: Run DuckDB conversion on filtered PBF..."
+          /app/entrypoint.sh "$FILTERED_PBF" "$OUTPUT_PARQUET"
+
+          # Reclaim disk space: remove intermediate filtered PBF
+          rm -f "$FILTERED_PBF"
 
     - task: PublishPipelineArtifact@1
       enabled: true

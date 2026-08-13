@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     ca-certificates \
     libgdal-dev \
+    osmium-tool \
     && rm -rf /var/lib/apt/lists/*
 
 # Install DuckDB CLI — pinned version for reproducibility
