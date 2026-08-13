@@ -46,6 +46,7 @@ jobs:
       definition: '6'
       artifactName: 'addresses-parquet-archives'
       ${{ if ne(parameters.specificBuildId, '') }}:
+        buildVersionToDownload: 'specific'
         pipelineId: '${{ parameters.specificBuildId }}'
       ${{ if eq(parameters.specificBuildId, '') }}:
         buildVersionToDownload: 'latest'
