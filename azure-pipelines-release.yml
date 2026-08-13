@@ -14,6 +14,10 @@ parameters:
   displayName: 'GitHub Release Title'
   type: string
   default: 'OSM Address GeoParquet Release v1.0.0'
+- name: specificBuildId
+  displayName: 'Specific Build ID (optional: e.g. 248. Leave blank for latest build)'
+  type: string
+  default: ''
 - name: isDraft
   displayName: 'Draft Release'
   type: boolean
@@ -33,14 +37,17 @@ jobs:
   steps:
   - checkout: self
 
-  # Download latest build artifacts from addresses-parquet pipeline (definition 6)
+  # Download build artifacts from addresses-parquet pipeline (definition 6)
   - task: DownloadPipelineArtifact@2
-    displayName: 'Download latest build artifacts'
+    displayName: 'Download build artifacts'
     inputs:
       buildType: 'specific'
       project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
       definition: '6'
-      buildVersionToDownload: 'latest'
+      ${{ if ne(parameters.specificBuildId, '') }}:
+        pipelineId: '${{ parameters.specificBuildId }}'
+      ${{ if eq(parameters.specificBuildId, '') }}:
+        buildVersionToDownload: 'latest'
       targetPath: '$(System.DefaultWorkingDirectory)/downloads'
 
   - task: Bash@3
