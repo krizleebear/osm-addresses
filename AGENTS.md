@@ -21,7 +21,7 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
 
 1. **Build Pipeline (`azure-pipelines.yml` / `addresses-parquet-pipeline`):**
    - 169 region matrix definitions following Geofabrik hierarchy across 7 continents.
-   - Includes single-threaded `warmup` stage to prime `mirror.gcr.io` CDN cache before matrix jobs run.
+   - Includes single-threaded `warmup` stage that verifies image availability: pulls from `ghcr.io` (primary) with 3 retries, then falls back to `mirror.gcr.io` if GHCR is unavailable. Fails explicitly if both registries fail.
    - Publishes continental archives (`addresses-parquet-europe.tar.gz`, etc.), global archive (`addresses-parquet-all.tar.gz`), and pre-filtered address PBF artifacts (`addresses-pbf-$(CC)-$(REGION)`).
 
 2. **Standalone Manual GitHub Release Pipeline (`azure-pipelines-release.yml` / `addresses-release-pipeline`):**
@@ -34,8 +34,17 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
 
 1. **Azure DevOps Job Container Entrypoint Safety:**
    - Docker images intended for Azure DevOps job containers (`container: <image>`) must NOT define an exec-form `ENTRYPOINT` that exits on unknown arguments (such as `ENTRYPOINT ["/app/entrypoint.sh"]`), because Azure DevOps starts job containers with `sleep infinity`. Use `CMD ["/bin/bash"]` in the Dockerfile and invoke processing scripts explicitly in pipeline steps.
-2. **Docker Schema 2 Manifest Requirement for `mirror.gcr.io`**:
-   - Container images pushed to Docker Hub for `mirror.gcr.io` consumption must be built in Docker Schema 2 format (`application/vnd.docker.distribution.manifest.v2+json`) using standard `docker build` or `docker buildx build --provenance=false`. Modern OCI attestation/provenance blobs cause `unknown blob` 404 errors on `mirror.gcr.io`.
+2. **Container Registry Strategy (GHCR primary, `mirror.gcr.io` fallback)**:
+   - The `osm2parquet` container image must be published to **both** registries on every version release:
+     ```bash
+     docker build -t krizleebear/osm2parquet:vX.Y.Z docker/osm2parquet/
+     docker push krizleebear/osm2parquet:vX.Y.Z                        # Docker Hub
+     docker tag  krizleebear/osm2parquet:vX.Y.Z ghcr.io/krizleebear/osm2parquet:vX.Y.Z
+     docker push ghcr.io/krizleebear/osm2parquet:vX.Y.Z               # GHCR (primary)
+     ```
+   - The `resources.containers` image in `azure-pipelines.yml` always references `ghcr.io/krizleebear/osm2parquet:vX.Y.Z` (public, no rate limits, no auth required).
+   - `mirror.gcr.io` is retained only as a warmup-job fallback. Images must be built in Docker Schema 2 format (`docker build`, not `docker buildx build` with provenance) to avoid `unknown blob` errors on `mirror.gcr.io`.
+   - The GHCR package (`ghcr.io/krizleebear/osm2parquet`) must remain **public** to allow anonymous pulls from Azure DevOps hosted agents.
 3. **DuckDB Script Template Substitution Invariant:**
    - DuckDB `COPY ... TO` statements require string literal paths. Do not attempt `getvariable()` inside `COPY TO`. Use `sed` token substitution (`__INPUT_PBF__`, `__OUTPUT_PARQUET__`) on SQL templates before piping into `duckdb`.
 4. **Azure DevOps Parameter Condition Syntax**:
