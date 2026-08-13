@@ -2,10 +2,17 @@
 # Converts cached OSM PBF artifacts from the osm-download pipeline (definition 3)
 # into ZSTD-compressed GeoParquet files containing address-tagged features.
 #
+# Prerequisites:
+#   The osm2parquet Docker image must be built and pushed to Docker Hub once:
+#     docker buildx build --platform linux/amd64 \
+#       -t krizleebear/osm2parquet:latest \
+#       docker/osm2parquet/ --push
+#   The mirror.gcr.io pull-through cache then serves the image to parallel
+#   matrix jobs without hitting Docker Hub rate limits.
+#
 # Stages:
-#   build_image -- Build & push the osm2parquet Docker image (skippable)
-#   convert     -- Per-region PBF -> Parquet conversion (Container-Job-Pattern)
-#   package     -- Bundle all per-region Parquet files into a single archive
+#   convert -- Per-region PBF -> Parquet conversion (Container-Job-Pattern)
+#   package -- Bundle all per-region Parquet files into a single archive
 name: addresses-parquet-pipeline
 
 trigger: none
@@ -13,50 +20,23 @@ trigger: none
 pool:
   vmImage: 'ubuntu-latest'
 
-parameters:
-- name: skipImageBuild
-  displayName: 'Skip Docker image build (use existing mirror.gcr.io/krizleebear/osm2parquet:latest)'
-  type: boolean
-  default: false
-
 resources:
   containers:
-  # Use mirror.gcr.io to prevent Docker Hub pull rate limits during parallel matrix execution
+  # Use mirror.gcr.io to prevent Docker Hub pull rate limits during parallel matrix execution.
+  # Always reference an immutable digest (never a mutable tag like :latest) so the mirror
+  # cache cannot serve a stale image. Update this digest after every image rebuild:
+  #   docker buildx imagetools inspect krizleebear/osm2parquet:v1.0.0 --format '{{json .Manifest.Digest}}'
   - container: osm2parquet
-    image: mirror.gcr.io/krizleebear/osm2parquet:latest
+    # krizleebear/osm2parquet:v1.0.0
+    image: mirror.gcr.io/krizleebear/osm2parquet@sha256:7f3838b7420c30516095f57c27f457cdfc540dc74ac331f30ff48e3bab0444c6
 
 # ---------------------------------------------------------------------------
-# Stage 1: Build & push the osm2parquet Docker image
-# ---------------------------------------------------------------------------
-stages:
-- stage: build_image
-  displayName: 'Build & push osm2parquet Docker image'
-  condition: eq('${{ parameters.skipImageBuild }}', false)
-
-  jobs:
-  - job: build
-    displayName: 'Build and push image'
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-    - checkout: self
-
-    - task: Docker@2
-      displayName: 'Build and push osm2parquet image to GCR mirror'
-      inputs:
-        command: buildAndPush
-        dockerfile: 'docker/osm2parquet/Dockerfile'
-        repository: 'mirror.gcr.io/krizleebear/osm2parquet'
-        tags: 'latest'
-
-# ---------------------------------------------------------------------------
-# Stage 2: Convert PBF -> GeoParquet (per region, parallel matrix)
+# Stage 1: Convert PBF -> GeoParquet (per region, parallel matrix)
 # Pilot: DACH + Benelux (6 regions). Extend matrix to add more countries.
 # ---------------------------------------------------------------------------
+stages:
 - stage: convert
   displayName: 'Convert OSM PBF to GeoParquet'
-  dependsOn: build_image
-  condition: in(dependencies.build_image.result, 'Succeeded', 'Skipped')
 
   jobs:
   - job: convert
