@@ -17,6 +17,19 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
 
 ---
 
+## Pipeline Architecture & Conventions
+
+1. **Build Pipeline (`azure-pipelines.yml` / `addresses-parquet-pipeline`):**
+   - 169 region matrix definitions following Geofabrik hierarchy across 7 continents.
+   - Includes single-threaded `warmup` stage to prime `mirror.gcr.io` CDN cache before matrix jobs run.
+   - Publishes continental archives (`addresses-parquet-europe.tar.gz`, etc.), global archive (`addresses-parquet-all.tar.gz`), and pre-filtered address PBF artifacts (`addresses-pbf-$(CC)-$(REGION)`).
+
+2. **Standalone Manual GitHub Release Pipeline (`azure-pipelines-release.yml` / `addresses-release-pipeline`):**
+   - Releases are triggered manually on-demand (`trigger: none`).
+   - Downloads latest build artifacts, packages global (`addresses-parquet-all.tar.gz`), continental (`addresses-parquet-*.tar.gz`), and individual country (`.parquet`) files, and publishes them as GitHub Release assets using service connection `3c34db30-d57b-42e2-a970-857bd932c6c0`.
+
+---
+
 ## Git Workflow & Rules
 
 1. **Azure DevOps Job Container Entrypoint Safety:**
