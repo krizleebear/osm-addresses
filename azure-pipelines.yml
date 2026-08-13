@@ -3,12 +3,13 @@
 # into ZSTD-compressed GeoParquet files containing address-tagged features.
 #
 # Prerequisites:
-#   The osm2parquet Docker image must be built and pushed to Docker Hub once:
-#     docker buildx build --platform linux/amd64 \
-#       -t krizleebear/osm2parquet:latest \
-#       docker/osm2parquet/ --push
-#   The mirror.gcr.io pull-through cache then serves the image to parallel
-#   matrix jobs without hitting Docker Hub rate limits.
+#   The osm2parquet Docker image must be built and pushed to both registries:
+#     docker build -t krizleebear/osm2parquet:vX.Y.Z docker/osm2parquet/
+#     docker push krizleebear/osm2parquet:vX.Y.Z                   # Docker Hub
+#     docker tag krizleebear/osm2parquet:vX.Y.Z ghcr.io/krizleebear/osm2parquet:vX.Y.Z
+#     docker push ghcr.io/krizleebear/osm2parquet:vX.Y.Z           # GHCR (primary)
+#   GHCR is used as primary registry (no rate limits, no mirror.gcr.io flakiness).
+#   mirror.gcr.io is retained as fallback in the warmup job.
 #
 # Stages:
 #   convert -- Per-region PBF -> Parquet conversion (Container-Job-Pattern)
@@ -27,54 +28,74 @@ pool:
 
 resources:
   containers:
-  # Use mirror.gcr.io to prevent Docker Hub pull rate limits during parallel matrix execution.
-  # Always reference an immutable digest so the mirror cache cannot serve a stale image.
+  # Primary registry: GHCR (no rate limits, no mirror.gcr.io flakiness).
+  # Fallback: mirror.gcr.io is attempted in the warmup job for cache pre-warming.
   - container: osm2parquet
     # krizleebear/osm2parquet:v1.0.5 (standard Docker Schema 2 format)
-    image: mirror.gcr.io/krizleebear/osm2parquet:v1.0.5
+    image: ghcr.io/krizleebear/osm2parquet:v1.0.5
 
 stages:
 # ---------------------------------------------------------------------------
-# Stage 1: Warmup container image on mirror.gcr.io
-# Single job pulls image first so mirror.gcr.io caches layers before 169
-# matrix jobs pull simultaneously.
+# Stage 1: Verify container image availability
+# Pulls from GHCR (primary). Falls back to mirror.gcr.io if GHCR is
+# unavailable. Fails fast with a clear message if both registries fail.
 # ---------------------------------------------------------------------------
 - stage: warmup
-  displayName: 'Warmup container image on mirror.gcr.io'
+  displayName: 'Verify container image availability'
 
   jobs:
   - job: warmup
-    displayName: 'Warmup image cache'
+    displayName: 'Verify image pull (GHCR primary, mirror.gcr.io fallback)'
     pool:
       vmImage: 'ubuntu-latest'
     steps:
     - checkout: none
 
     - task: Bash@3
-      displayName: 'Pull image from mirror.gcr.io until cached'
+      displayName: 'Pull image: GHCR primary, mirror.gcr.io fallback'
       inputs:
         targetType: 'inline'
         script: |
           set -e
-          IMAGE="mirror.gcr.io/krizleebear/osm2parquet:v1.0.5"
-          echo "[INFO] Pulling $IMAGE to warm up mirror.gcr.io cache..."
+          GHCR_IMAGE="ghcr.io/krizleebear/osm2parquet:v1.0.5"
+          MIRROR_IMAGE="mirror.gcr.io/krizleebear/osm2parquet:v1.0.5"
 
-          MAX_RETRIES=5
-          RETRY_COUNT=0
-          until docker pull "$IMAGE" || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-            echo "[WARN] Pull failed. Retrying in 15 seconds ($RETRY_COUNT/$MAX_RETRIES)..."
-            sleep 15
-          done
+          pull_with_retry() {
+            local IMAGE="$1"
+            local MAX_RETRIES=3
+            local RETRY_COUNT=0
+            until docker pull "$IMAGE"; do
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+                echo "[WARN] Pull failed for $IMAGE after $MAX_RETRIES attempts."
+                return 1
+              fi
+              echo "[WARN] Pull failed for $IMAGE. Retrying in 15 seconds ($RETRY_COUNT/$MAX_RETRIES)..."
+              sleep 15
+            done
+            return 0
+          }
 
-          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-            echo "****************************************************************"
-            echo " ERROR: Failed to pull image from mirror.gcr.io after $MAX_RETRIES attempts!"
-            echo "****************************************************************"
-            exit 1
+          echo "[INFO] Attempting pull from GHCR (primary): $GHCR_IMAGE"
+          if pull_with_retry "$GHCR_IMAGE"; then
+            echo "[OK] Image available on GHCR."
+            exit 0
           fi
 
-          echo "[OK] Container image warm-up complete!"
+          echo "[WARN] GHCR unavailable. Attempting fallback: $MIRROR_IMAGE"
+          if pull_with_retry "$MIRROR_IMAGE"; then
+            echo "[OK] Image available on mirror.gcr.io (fallback)."
+            exit 0
+          fi
+
+          echo "****************************************************************"
+          echo " ERROR: Failed to pull image from both registries!"
+          echo "   Primary:  $GHCR_IMAGE"
+          echo "   Fallback: $MIRROR_IMAGE"
+          echo " Remediation: Verify that the image is published on GHCR and"
+          echo "   Docker Hub, and that mirror.gcr.io has no ongoing outage."
+          echo "****************************************************************"
+          exit 1
 
 # ---------------------------------------------------------------------------
 # Stage 2: Convert PBF -> GeoParquet (per region, parallel matrix)
