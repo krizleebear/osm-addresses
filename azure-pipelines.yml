@@ -23,20 +23,61 @@ pool:
 resources:
   containers:
   # Use mirror.gcr.io to prevent Docker Hub pull rate limits during parallel matrix execution.
-  # Always reference an immutable digest (never a mutable tag like :latest) so the mirror
-  # cache cannot serve a stale image. Update this digest after every image rebuild:
-  #   docker buildx imagetools inspect krizleebear/osm2parquet:v1.0.3 --format '{{json .Manifest.Digest}}'
+  # Always reference an immutable digest so the mirror cache cannot serve a stale image.
   - container: osm2parquet
     # krizleebear/osm2parquet:v1.0.3
     image: mirror.gcr.io/krizleebear/osm2parquet@sha256:8e32cb6453766773347db67b1e42eac0180beed8af35000fb4492649d6cc75dc
 
-# ---------------------------------------------------------------------------
-# Stage 1: Convert PBF -> GeoParquet (per region, parallel matrix)
-# Pilot: DACH + Benelux (6 regions). Extend matrix to add more countries.
-# ---------------------------------------------------------------------------
 stages:
+# ---------------------------------------------------------------------------
+# Stage 1: Warmup container image on mirror.gcr.io
+# Single job pulls image first so mirror.gcr.io caches layers before 169
+# matrix jobs pull simultaneously.
+# ---------------------------------------------------------------------------
+- stage: warmup
+  displayName: 'Warmup container image on mirror.gcr.io'
+
+  jobs:
+  - job: warmup
+    displayName: 'Warmup image cache'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: none
+
+    - task: Bash@3
+      displayName: 'Pull image from mirror.gcr.io until cached'
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -e
+          IMAGE="mirror.gcr.io/krizleebear/osm2parquet@sha256:8e32cb6453766773347db67b1e42eac0180beed8af35000fb4492649d6cc75dc"
+          echo "[INFO] Pulling $IMAGE to warm up mirror.gcr.io cache..."
+
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          until docker pull "$IMAGE" || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "[WARN] Pull failed. Retrying in 15 seconds ($RETRY_COUNT/$MAX_RETRIES)..."
+            sleep 15
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "****************************************************************"
+            echo " ERROR: Failed to pull image from mirror.gcr.io after $MAX_RETRIES attempts!"
+            echo "****************************************************************"
+            exit 1
+          fi
+
+          echo "[OK] Container image warm-up complete!"
+
+# ---------------------------------------------------------------------------
+# Stage 2: Convert PBF -> GeoParquet (per region, parallel matrix)
+# ---------------------------------------------------------------------------
 - stage: convert
   displayName: 'Convert OSM PBF to GeoParquet'
+  dependsOn: warmup
+  condition: succeeded()
 
   jobs:
   - job: convert
