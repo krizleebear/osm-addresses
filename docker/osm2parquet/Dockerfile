@@ -40,4 +40,4 @@ RUN useradd -r -u 1000 -d /app duckdb \
 
 USER duckdb
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["/bin/bash"]
