@@ -805,24 +805,41 @@ stages:
         script: |
           set -e
 
-          INPUT_PBF="osm-data-$(OSM_REGION)/$(OSM_REGION).osm.pbf"
           FILTERED_PBF="$(COUNTRY_CODE)_$(OSM_REGION).addresses.pbf"
           OUTPUT_PARQUET="$(COUNTRY_CODE)_$(OSM_REGION).addresses.parquet"
           SKIP_OSMIUM="${{ parameters.skipOsmiumFilter }}"
 
           if [ "$SKIP_OSMIUM" = "false" ] || [ "$SKIP_OSMIUM" = "False" ]; then
+            FOUND_PBF=$(find . -name "$(OSM_REGION).osm.pbf" 2>/dev/null | head -n 1)
+            if [ -n "$FOUND_PBF" ] && [ -f "$FOUND_PBF" ]; then
+              INPUT_PBF="$FOUND_PBF"
+            else
+              INPUT_PBF="osm-data-$(OSM_REGION)/$(OSM_REGION).osm.pbf"
+            fi
+
             if [ ! -f "$INPUT_PBF" ]; then
               echo "****************************************************************"
               echo " ERROR: Missing PBF file for region '$(OSM_REGION)'!"
+              echo ""
+              echo " File '$(OSM_REGION).osm.pbf' was not found in workspace."
+              echo ""
+              echo " Cause:"
+              echo "   The osm-download pipeline (definition 3) has not cached"
+              echo "   the PBF artifact for '$(OSM_REGION)', or the artifact expired."
+              echo ""
+              echo " Solution:"
+              echo "   Run the osm-download pipeline (definition 3) first to"
+              echo "   populate cached PBF artifacts for '$(OSM_REGION)'."
               echo "****************************************************************"
               exit 1
             fi
 
+            echo "[INFO] Found input PBF: $INPUT_PBF"
             echo "[INFO] Filtering address-tagged features via osmium..."
             osmium tags-filter "$INPUT_PBF" n/addr:housenumber wr/addr:housenumber -o "$FILTERED_PBF" --overwrite
 
             echo "[INFO] Reclaiming disk space: removing raw input PBF immediately..."
-            rm -rf "osm-data-$(OSM_REGION)"
+            rm -rf "osm-data-$(OSM_REGION)" "$(OSM_REGION).osm.pbf"
           else
             echo "[INFO] Skipping Osmium filter stage (using pre-filtered address PBF artifact)."
             if [ ! -f "$FILTERED_PBF" ]; then
