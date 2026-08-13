@@ -39,11 +39,12 @@ jobs:
 
   # Download build artifacts from addresses-parquet pipeline (definition 6)
   - task: DownloadPipelineArtifact@2
-    displayName: 'Download build artifacts'
+    displayName: 'Download build archives artifact'
     inputs:
       buildType: 'specific'
       project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
       definition: '6'
+      artifactName: 'addresses-parquet-archives'
       ${{ if ne(parameters.specificBuildId, '') }}:
         pipelineId: '${{ parameters.specificBuildId }}'
       ${{ if eq(parameters.specificBuildId, '') }}:
@@ -70,12 +71,12 @@ jobs:
           echo " ERROR: No addresses-parquet-all.tar.gz artifact found in downloads!"
           echo ""
           echo " Cause:"
-          echo "   The latest build of pipeline definition 6 (addresses-parquet)"
-          echo "   failed or did not publish its final 'package' stage artifacts."
+          echo "   The selected build of pipeline definition 6 (addresses-parquet)"
+          echo "   failed or did not publish its final 'package' stage archives."
           echo ""
           echo " Solution:"
-          echo "   Run the addresses-parquet pipeline to completion before triggering"
-          echo "   this release pipeline."
+          echo "   Pass the specific successful Build ID (e.g. 248) into the"
+          echo "   'specificBuildId' parameter when launching this release pipeline."
           echo "****************************************************************"
           exit 1
         fi
