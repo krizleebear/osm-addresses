@@ -33,11 +33,8 @@ RUN duckdb -c "INSTALL spatial;"
 COPY osmconf.ini export_addresses.sql entrypoint.sh /app/
 RUN chmod +x /app/entrypoint.sh
 
-# Create non-root user. Home is /app so DuckDB finds pre-installed extensions
-# at /app/.duckdb/ at runtime (HOME=/app is inherited from ENV above).
-RUN useradd -r -u 1000 -d /app duckdb \
-    && chown -R duckdb:duckdb /app
-
-USER duckdb
+# Grant 777 permissions to /app so Azure DevOps unprivileged runner user
+# (vsts_azpcontainer UID 1001) can read pre-installed spatial extension at /app/.duckdb/
+RUN chmod -R 777 /app
 
 CMD ["/bin/bash"]

@@ -25,10 +25,10 @@ resources:
   # Use mirror.gcr.io to prevent Docker Hub pull rate limits during parallel matrix execution.
   # Always reference an immutable digest (never a mutable tag like :latest) so the mirror
   # cache cannot serve a stale image. Update this digest after every image rebuild:
-  #   docker buildx imagetools inspect krizleebear/osm2parquet:v1.0.1 --format '{{json .Manifest.Digest}}'
+  #   docker buildx imagetools inspect krizleebear/osm2parquet:v1.0.2 --format '{{json .Manifest.Digest}}'
   - container: osm2parquet
-    # krizleebear/osm2parquet:v1.0.1
-    image: mirror.gcr.io/krizleebear/osm2parquet@sha256:289b7ff6932d9791bd552d91fe63ca82a03afab91d35656cd1fcab93d97914a8
+    # krizleebear/osm2parquet:v1.0.2
+    image: mirror.gcr.io/krizleebear/osm2parquet@sha256:b3da69345c016d46c9f073d27843632925d325b477d40c760195505d94e3ba26
 
 # ---------------------------------------------------------------------------
 # Stage 1: Convert PBF -> GeoParquet (per region, parallel matrix)
