@@ -1,0 +1,238 @@
+# OSM address export pipeline: PBF -> GeoParquet (DuckDB-based, no Java)
+# Converts cached OSM PBF artifacts from the osm-download pipeline (definition 3)
+# into ZSTD-compressed GeoParquet files containing address-tagged features.
+#
+# Stages:
+#   build_image -- Build & push the osm2parquet Docker image (skippable)
+#   convert     -- Per-region PBF -> Parquet conversion (Container-Job-Pattern)
+#   package     -- Bundle all per-region Parquet files into a single archive
+name: addresses-parquet-pipeline
+
+trigger: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+parameters:
+- name: skipImageBuild
+  displayName: 'Skip Docker image build (use existing mirror.gcr.io/krizleebear/osm2parquet:latest)'
+  type: boolean
+  default: false
+
+resources:
+  containers:
+  # Use mirror.gcr.io to prevent Docker Hub pull rate limits during parallel matrix execution
+  - container: osm2parquet
+    image: mirror.gcr.io/krizleebear/osm2parquet:latest
+
+# ---------------------------------------------------------------------------
+# Stage 1: Build & push the osm2parquet Docker image
+# ---------------------------------------------------------------------------
+stages:
+- stage: build_image
+  displayName: 'Build & push osm2parquet Docker image'
+  condition: eq('${{ parameters.skipImageBuild }}', false)
+
+  jobs:
+  - job: build
+    displayName: 'Build and push image'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+
+    - task: Docker@2
+      displayName: 'Build and push osm2parquet image to GCR mirror'
+      inputs:
+        command: buildAndPush
+        dockerfile: 'docker/osm2parquet/Dockerfile'
+        repository: 'mirror.gcr.io/krizleebear/osm2parquet'
+        tags: 'latest'
+
+# ---------------------------------------------------------------------------
+# Stage 2: Convert PBF -> GeoParquet (per region, parallel matrix)
+# Pilot: DACH + Benelux (6 regions). Extend matrix to add more countries.
+# ---------------------------------------------------------------------------
+- stage: convert
+  displayName: 'Convert OSM PBF to GeoParquet'
+  dependsOn: build_image
+  condition: in(dependencies.build_image.result, 'Succeeded', 'Skipped')
+
+  jobs:
+  - job: convert
+    displayName: 'PBF -> Parquet'
+    timeoutInMinutes: 360
+    workspace:
+      clean: all
+    container: osm2parquet
+
+    strategy:
+      matrix:
+        # --- DACH ---
+        germany:
+          OSM_REGION: 'germany'
+          COUNTRY_CODE: 'DE'
+          PBF_URL: 'https://download.geofabrik.de/europe/germany-latest.osm.pbf'
+        austria:
+          OSM_REGION: 'austria'
+          COUNTRY_CODE: 'AT'
+          PBF_URL: 'https://download.geofabrik.de/europe/austria-latest.osm.pbf'
+        switzerland:
+          OSM_REGION: 'switzerland'
+          COUNTRY_CODE: 'CH'
+          PBF_URL: 'https://download.geofabrik.de/europe/switzerland-latest.osm.pbf'
+        # --- Benelux ---
+        netherlands:
+          OSM_REGION: 'netherlands'
+          COUNTRY_CODE: 'NL'
+          PBF_URL: 'https://download.geofabrik.de/europe/netherlands-latest.osm.pbf'
+        belgium:
+          OSM_REGION: 'belgium'
+          COUNTRY_CODE: 'BE'
+          PBF_URL: 'https://download.geofabrik.de/europe/belgium-latest.osm.pbf'
+        luxembourg:
+          OSM_REGION: 'luxembourg'
+          COUNTRY_CODE: 'LU'
+          PBF_URL: 'https://download.geofabrik.de/europe/luxembourg-latest.osm.pbf'
+
+    steps:
+    - checkout: none
+
+    # Download cached PBF from the osm-download pipeline (definition 3).
+    # Never fetch directly from Geofabrik here — that is the download pipeline's job.
+    - task: DownloadPipelineArtifact@2
+      enabled: true
+      displayName: 'Download cached OSM PBF (from osm-download pipeline)'
+      inputs:
+        buildType: 'specific'
+        project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
+        definition: '3'
+        buildVersionToDownload: 'latest'
+        itemPattern: 'osm-data-$(OSM_REGION)/$(OSM_REGION).osm.pbf'
+        targetPath: '$(System.DefaultWorkingDirectory)'
+
+    - task: Bash@3
+      enabled: true
+      displayName: 'Convert PBF to GeoParquet'
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -e
+
+          INPUT_PBF="osm-data-$(OSM_REGION)/$(OSM_REGION).osm.pbf"
+          OUTPUT_PARQUET="$(COUNTRY_CODE)_$(OSM_REGION).addresses.parquet"
+
+          if [ ! -f "$INPUT_PBF" ]; then
+            echo "****************************************************************"
+            echo " ERROR: Missing PBF file for region '$(OSM_REGION)'!"
+            echo ""
+            echo " File '$INPUT_PBF' was not found."
+            echo ""
+            echo " Cause:"
+            echo "   The osm-download pipeline (definition 3) has not been"
+            echo "   executed for '$(OSM_REGION)' yet, or the artifact has expired."
+            echo ""
+            echo " Solution:"
+            echo "   Run the osm-download pipeline first to cache the PBF"
+            echo "   artifact for '$(OSM_REGION)'."
+            echo "****************************************************************"
+            exit 1
+          fi
+
+          /app/entrypoint.sh "$INPUT_PBF" "$OUTPUT_PARQUET"
+
+          # Reclaim disk space: remove heavy raw PBF immediately after conversion
+          rm -rf "osm-data-$(OSM_REGION)"
+
+    - task: PublishPipelineArtifact@1
+      enabled: true
+      displayName: 'Publish GeoParquet artifact'
+      inputs:
+        targetPath: '$(COUNTRY_CODE)_$(OSM_REGION).addresses.parquet'
+        artifact: 'addresses-parquet-$(COUNTRY_CODE)-$(OSM_REGION)'
+        publishLocation: 'pipeline'
+
+    - task: Bash@3
+      displayName: 'Cleanup workspace'
+      condition: always()
+      inputs:
+        targetType: 'inline'
+        script: |
+          rm -rf $(System.DefaultWorkingDirectory)/*
+
+# ---------------------------------------------------------------------------
+# Stage 3: Bundle all per-region Parquet files into a single archive
+# ---------------------------------------------------------------------------
+- stage: package
+  displayName: 'Package global address GeoParquet archive'
+  dependsOn: convert
+  condition: always()
+
+  jobs:
+  - job: package
+    displayName: 'Bundle Parquet files'
+    timeoutInMinutes: 60
+    workspace:
+      clean: all
+    pool:
+      vmImage: 'ubuntu-latest'
+
+    steps:
+    - checkout: none
+
+    - task: DownloadPipelineArtifact@2
+      enabled: true
+      displayName: 'Download all per-region Parquet artifacts'
+      inputs:
+        buildType: 'current'
+        itemPattern: 'addresses-parquet-*/**'
+        targetPath: '$(System.DefaultWorkingDirectory)/parquet'
+
+    - task: Bash@3
+      enabled: true
+      displayName: 'Bundle into addresses-parquet.tar.gz'
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -x
+          mkdir -p output
+
+          # Flatten: move all .parquet files into output/
+          find parquet -name "*.parquet" -exec mv {} output/ \;
+
+          PARQUET_COUNT=$(find output -name "*.parquet" | wc -l)
+          if [ "$PARQUET_COUNT" -eq 0 ]; then
+            echo "****************************************************************"
+            echo " ERROR: No GeoParquet files were produced by the convert stage!"
+            echo ""
+            echo " Cause:"
+            echo "   All convert jobs may have failed, or the downloaded artifacts"
+            echo "   are empty."
+            echo ""
+            echo " Solution:"
+            echo "   Check the 'convert' stage logs for individual region errors."
+            echo "****************************************************************"
+            exit 1
+          fi
+
+          echo "[INFO] Bundling $PARQUET_COUNT GeoParquet file(s)..."
+          ls -lh output/
+
+          tar cfz addresses-parquet.tar.gz output/
+          echo "[OK] Created addresses-parquet.tar.gz ($(du -sh addresses-parquet.tar.gz | cut -f1))"
+
+    - task: PublishPipelineArtifact@1
+      enabled: true
+      displayName: 'Publish global addresses-parquet archive'
+      inputs:
+        targetPath: '$(System.DefaultWorkingDirectory)/addresses-parquet.tar.gz'
+        artifact: 'addresses-parquet'
+        publishLocation: 'pipeline'
+
+    - task: Bash@3
+      displayName: 'Cleanup workspace'
+      condition: always()
+      inputs:
+        targetType: 'inline'
+        script: |
+          rm -rf $(System.DefaultWorkingDirectory)/*
