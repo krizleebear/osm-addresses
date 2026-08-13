@@ -13,9 +13,11 @@
 # Stages:
 #   convert -- Per-region PBF -> Parquet conversion (Container-Job-Pattern)
 #   package -- Bundle all per-region Parquet files into a single archive
-name: addresses-parquet-pipeline
-
-trigger: none
+parameters:
+- name: skipOsmiumFilter
+  displayName: 'Skip Osmium filtering (use pre-filtered addresses.pbf pipeline artifacts)'
+  type: boolean
+  default: false
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -772,15 +774,27 @@ stages:
 
     # Download cached PBF from the osm-download pipeline (definition 3).
     # Never fetch directly from Geofabrik here — that is the download pipeline's job.
+    # Download raw PBF from osm-download pipeline when skipOsmiumFilter is false
     - task: DownloadPipelineArtifact@2
       enabled: true
       displayName: 'Download cached OSM PBF (from osm-download pipeline)'
+      condition: eq('${{ parameters.skipOsmiumFilter }}', false)
       inputs:
         buildType: 'specific'
         project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
         definition: '3'
         buildVersionToDownload: 'latest'
         itemPattern: 'osm-data-$(OSM_REGION)/$(OSM_REGION).osm.pbf'
+        targetPath: '$(System.DefaultWorkingDirectory)'
+
+    # Download pre-filtered address PBF artifact when skipOsmiumFilter is true
+    - task: DownloadPipelineArtifact@2
+      enabled: true
+      displayName: 'Download pre-filtered address PBF artifact'
+      condition: eq('${{ parameters.skipOsmiumFilter }}', true)
+      inputs:
+        buildType: 'current'
+        artifact: 'addresses-pbf-$(COUNTRY_CODE)-$(OSM_REGION)'
         targetPath: '$(System.DefaultWorkingDirectory)'
 
     - task: Bash@3
@@ -792,37 +806,45 @@ stages:
           set -e
 
           INPUT_PBF="osm-data-$(OSM_REGION)/$(OSM_REGION).osm.pbf"
-          FILTERED_PBF="$(OSM_REGION).filtered.pbf"
+          FILTERED_PBF="$(COUNTRY_CODE)_$(OSM_REGION).addresses.pbf"
           OUTPUT_PARQUET="$(COUNTRY_CODE)_$(OSM_REGION).addresses.parquet"
 
-          if [ ! -f "$INPUT_PBF" ]; then
-            echo "****************************************************************"
-            echo " ERROR: Missing PBF file for region '$(OSM_REGION)'!"
-            echo ""
-            echo " File '$INPUT_PBF' was not found."
-            echo ""
-            echo " Cause:"
-            echo "   The osm-download pipeline (definition 3) has not been"
-            echo "   executed for '$(OSM_REGION)' yet, or the artifact has expired."
-            echo ""
-            echo " Solution:"
-            echo "   Run the osm-download pipeline first to cache the PBF"
-            echo "   artifact for '$(OSM_REGION)'."
-            echo "****************************************************************"
-            exit 1
+          if [ "${{ parameters.skipOsmiumFilter }}" = "false" ]; then
+            if [ ! -f "$INPUT_PBF" ]; then
+              echo "****************************************************************"
+              echo " ERROR: Missing PBF file for region '$(OSM_REGION)'!"
+              echo "****************************************************************"
+              exit 1
+            fi
+
+            echo "[INFO] Filtering address-tagged features via osmium..."
+            osmium tags-filter "$INPUT_PBF" n/addr:housenumber wr/addr:housenumber -o "$FILTERED_PBF" --overwrite
+
+            echo "[INFO] Reclaiming disk space: removing raw input PBF immediately..."
+            rm -rf "osm-data-$(OSM_REGION)"
+          else
+            echo "[INFO] Skipping Osmium filter stage (using pre-filtered address PBF artifact)."
+            if [ ! -f "$FILTERED_PBF" ]; then
+              echo "****************************************************************"
+              echo " ERROR: Pre-filtered PBF file '$FILTERED_PBF' not found!"
+              echo "****************************************************************"
+              exit 1
+            fi
           fi
 
-          echo "[INFO] Step 1: Filter address-tagged features via osmium..."
-          osmium tags-filter "$INPUT_PBF" n/addr:housenumber wr/addr:housenumber -o "$FILTERED_PBF" --overwrite
-
-          echo "[INFO] Step 2: Reclaim disk space: removing raw input PBF immediately..."
-          rm -rf "osm-data-$(OSM_REGION)"
-
-          echo "[INFO] Step 3: Run DuckDB conversion on filtered PBF..."
+          echo "[INFO] Converting filtered PBF to GeoParquet via DuckDB..."
           /app/entrypoint.sh "$FILTERED_PBF" "$OUTPUT_PARQUET"
 
-          # Reclaim disk space: remove intermediate filtered PBF
           rm -f "$FILTERED_PBF"
+
+    - task: PublishPipelineArtifact@1
+      enabled: true
+      displayName: 'Publish pre-filtered address PBF artifact'
+      condition: eq('${{ parameters.skipOsmiumFilter }}', false)
+      inputs:
+        targetPath: '$(COUNTRY_CODE)_$(OSM_REGION).addresses.pbf'
+        artifact: 'addresses-pbf-$(COUNTRY_CODE)-$(OSM_REGION)'
+        publishLocation: 'pipeline'
 
     - task: PublishPipelineArtifact@1
       enabled: true
