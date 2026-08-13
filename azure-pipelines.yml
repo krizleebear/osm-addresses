@@ -778,7 +778,7 @@ stages:
     - task: DownloadPipelineArtifact@2
       enabled: true
       displayName: 'Download cached OSM PBF (from osm-download pipeline)'
-      condition: eq(parameters.skipOsmiumFilter, false)
+      condition: ${{ eq(parameters.skipOsmiumFilter, false) }}
       inputs:
         buildType: 'specific'
         project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
@@ -791,7 +791,7 @@ stages:
     - task: DownloadPipelineArtifact@2
       enabled: true
       displayName: 'Download pre-filtered address PBF artifact'
-      condition: eq(parameters.skipOsmiumFilter, true)
+      condition: ${{ eq(parameters.skipOsmiumFilter, true) }}
       inputs:
         buildType: 'current'
         artifact: 'addresses-pbf-$(COUNTRY_CODE)-$(OSM_REGION)'
@@ -841,7 +841,7 @@ stages:
     - task: PublishPipelineArtifact@1
       enabled: true
       displayName: 'Publish pre-filtered address PBF artifact'
-      condition: eq(parameters.skipOsmiumFilter, false)
+      condition: ${{ eq(parameters.skipOsmiumFilter, false) }}
       inputs:
         targetPath: '$(COUNTRY_CODE)_$(OSM_REGION).addresses.pbf'
         artifact: 'addresses-pbf-$(COUNTRY_CODE)-$(OSM_REGION)'
