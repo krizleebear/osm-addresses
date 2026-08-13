@@ -14,10 +14,6 @@ parameters:
   displayName: 'GitHub Release Title'
   type: string
   default: 'OSM Address GeoParquet Release v1.0.0'
-- name: sourcePipelineDefinitionId
-  displayName: 'Source Pipeline Definition ID (addresses-parquet build pipeline)'
-  type: string
-  default: '5'
 - name: isDraft
   displayName: 'Draft Release'
   type: boolean
@@ -37,13 +33,13 @@ jobs:
   steps:
   - checkout: self
 
-  # Download latest build artifacts from addresses-parquet pipeline
+  # Download latest build artifacts from addresses-parquet pipeline (definition 6)
   - task: DownloadPipelineArtifact@2
     displayName: 'Download latest build artifacts'
     inputs:
       buildType: 'specific'
       project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
-      definition: '${{ parameters.sourcePipelineDefinitionId }}'
+      definition: '6'
       buildVersionToDownload: 'latest'
       targetPath: '$(System.DefaultWorkingDirectory)/downloads'
 
@@ -67,7 +63,7 @@ jobs:
           echo " ERROR: No addresses-parquet-all.tar.gz artifact found in downloads!"
           echo ""
           echo " Cause:"
-          echo "   The latest build of pipeline definition ${{ parameters.sourcePipelineDefinitionId }}"
+          echo "   The latest build of pipeline definition 6 (addresses-parquet)"
           echo "   failed or did not publish its final 'package' stage artifacts."
           echo ""
           echo " Solution:"
