@@ -27,8 +27,8 @@ resources:
   # Use mirror.gcr.io to prevent Docker Hub pull rate limits during parallel matrix execution.
   # Always reference an immutable digest so the mirror cache cannot serve a stale image.
   - container: osm2parquet
-    # krizleebear/osm2parquet:v1.0.4 (--provenance=false)
-    image: mirror.gcr.io/krizleebear/osm2parquet@sha256:3ab6275593176f34b3adb8b29834e0a3a485bf27f6ec60f3a6790173aa776f6d
+    # krizleebear/osm2parquet:v1.0.5 (standard Docker Schema 2 format)
+    image: mirror.gcr.io/krizleebear/osm2parquet:v1.0.5
 
 stages:
 # ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ stages:
         targetType: 'inline'
         script: |
           set -e
-          IMAGE="mirror.gcr.io/krizleebear/osm2parquet@sha256:3ab6275593176f34b3adb8b29834e0a3a485bf27f6ec60f3a6790173aa776f6d"
+          IMAGE="mirror.gcr.io/krizleebear/osm2parquet:v1.0.5"
           echo "[INFO] Pulling $IMAGE to warm up mirror.gcr.io cache..."
 
           MAX_RETRIES=5
