@@ -53,6 +53,17 @@ Data is produced and published by two Azure DevOps pipelines:
 
 **Global Coverage**: 169 region definitions spanning Africa, Asia, Europe, Oceania, Central America, North America, and South America matching the [osm-polygons](https://github.com/krizleebear/osm-polygons) dataset.
 
+## Future Ideas & Roadmap
+
+Potential improvements for higher address density and coverage:
+- **Extended Filter Criteria & Place Fallbacks:** Include `addr:housenumber` tagged with `addr:place` (common in rural areas/hamlets lacking street names) or resolve `associatedStreet` relation references.
+- **Address Interpolation:** Support OSM address interpolation lines (`addr:interpolation=all|even|odd|alphabetic`) to generate synthesized point coordinates along streets where individual building housenumbers are unmapped (~2.57M lines globally, yielding an estimated 10–20M additional addresses).
+- **Unstructured Addresses:** Parse `addr:full` into structured components where individual address tags are absent.
+
+See [ADDRESS_COVERAGE_ROADMAP.md](file:///Users/krizleebear/development/osm-addresses/doc/ADDRESS_COVERAGE_ROADMAP.md) for detailed Taginfo metrics, gap analysis, and implementation concepts.
+
 ## License
 
 Data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), [ODbL](https://opendatacommons.org/licenses/odbl/).
+
+

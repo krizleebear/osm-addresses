@@ -56,3 +56,6 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
    - Use conventional commit prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
 7. **English Output Standard:**
    - Log outputs, diagnostic error messages, and pipeline notices must be written strictly in clear English.
+8. **Packaging Stage Dependency Safety (`condition: succeeded()`):**
+   - Packaging and bundling stages (such as `stage: package`) that aggregate artifacts from upstream parallel matrix jobs MUST use `condition: succeeded()`. Never use `condition: always()` on final bundling stages, as cancellation or upstream failure would trigger incomplete artifact archiving.
+

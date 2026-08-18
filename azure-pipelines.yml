@@ -908,7 +908,7 @@ stages:
 - stage: package
   displayName: 'Package global address GeoParquet archive'
   dependsOn: convert
-  condition: always()
+  condition: succeeded()
 
   jobs:
   - job: package

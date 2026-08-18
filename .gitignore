@@ -1,0 +1,6 @@
+.DS_Store
+*.pbf
+*.parquet
+*.tar.gz
+*.csv
+target/
