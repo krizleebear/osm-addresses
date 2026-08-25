@@ -58,4 +58,6 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
    - Log outputs, diagnostic error messages, and pipeline notices must be written strictly in clear English.
 8. **Packaging Stage Dependency Safety (`condition: succeeded()`):**
    - Packaging and bundling stages (such as `stage: package`) that aggregate artifacts from upstream parallel matrix jobs MUST use `condition: succeeded()`. Never use `condition: always()` on final bundling stages, as cancellation or upstream failure would trigger incomplete artifact archiving.
+9. **Evidence-Based Issue Analysis & Remote DuckDB Diagnostics:**
+   - Never make assumptions about dataset contents based solely on commit logs or code inspections. Always gather concrete evidence by directly querying release artifacts using DuckDB with `httpfs` (`duckdb -c "INSTALL httpfs; LOAD httpfs; SELECT ... FROM 'https://github.com/.../releases/download/.../....parquet'"`). Include reproducible diagnostic SQL queries in bug reports and responses.
 
