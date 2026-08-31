@@ -60,4 +60,7 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
    - Packaging and bundling stages (such as `stage: package`) that aggregate artifacts from upstream parallel matrix jobs MUST use `condition: succeeded()`. Never use `condition: always()` on final bundling stages, as cancellation or upstream failure would trigger incomplete artifact archiving.
 9. **Evidence-Based Issue Analysis & Remote DuckDB Diagnostics:**
    - Never make assumptions about dataset contents based solely on commit logs or code inspections. Always gather concrete evidence by directly querying release artifacts using DuckDB with `httpfs` (`duckdb -c "INSTALL httpfs; LOAD httpfs; SELECT ... FROM 'https://github.com/.../releases/download/.../....parquet'"`). Include reproducible diagnostic SQL queries in bug reports and responses.
+10. **Explanation Preceding Git Actions Invariant (Explain First, Commit Second):**
+    - The agent must always first output a clear, comprehensive explanation of the diagnosis, the rationale, and the exact changes in the visible response text before requesting permission or attempting to execute `git commit`, `git push`, or pipeline triggers. Never trigger permission prompts for Git actions without the user having seen the complete explanatory context first.
+
 
