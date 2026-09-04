@@ -23,13 +23,13 @@ COPY (
 
     UNION ALL
 
-    -- Building polygon features: use centroid as point geometry
+    -- Building polygon features: use representative point on surface geometry
     SELECT
         addr_street          AS street,
         addr_housenumber     AS number,
         addr_postcode        AS postcode,
         addr_city            AS city,
-        ST_Centroid(geom)       AS geometry
+        ST_PointOnSurface(geom) AS geometry
     FROM ST_Read(
         '__INPUT_PBF__',
         layer        = 'multipolygons',

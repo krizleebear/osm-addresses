@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libgdal-dev \
     osmium-tool \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install DuckDB CLI — pinned version for reproducibility
@@ -38,4 +39,9 @@ RUN chmod +x /app/entrypoint.sh
 # (vsts_azpcontainer UID 1001) can read pre-installed spatial extension at /app/.duckdb/
 RUN chmod -R 777 /app
 
+LABEL org.opencontainers.image.source="https://github.com/krizleebear/osm-addresses"
+LABEL org.opencontainers.image.description="DuckDB spatial converter for OSM GeoParquet exports"
+LABEL org.opencontainers.image.url="https://github.com/krizleebear/osm-addresses/blob/master/docker/osm2parquet/Dockerfile"
+
 CMD ["/bin/bash"]
+
