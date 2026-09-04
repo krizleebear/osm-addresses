@@ -1,6 +1,6 @@
 # OSM Address GeoParquet Manual GitHub Release Pipeline
-# Downloads latest build artifacts from the addresses-parquet pipeline,
-# extracts per-region files, generates release notes, and publishes a GitHub Release.
+# Downloads latest per-country GeoParquet build artifacts from the addresses-parquet pipeline,
+# prepares release assets, generates release notes, and publishes a GitHub Release.
 name: addresses-release-pipeline
 
 trigger: none # Manual execution only
@@ -15,9 +15,9 @@ parameters:
   type: string
   default: 'OSM Address GeoParquet Release v1.0.0'
 - name: specificBuildId
-  displayName: 'Specific Build ID (optional: e.g. 248. Leave blank for latest build)'
+  displayName: 'Specific Build ID (optional: e.g. 248. Leave blank or latest/auto for latest build)'
   type: string
-  default: ''
+  default: 'latest'
 - name: isDraft
   displayName: 'Draft Release'
   type: boolean
@@ -39,17 +39,17 @@ jobs:
 
   # Download build artifacts from addresses-parquet pipeline (definition 6)
   - task: DownloadPipelineArtifact@2
-    displayName: 'Download build archives artifact'
+    displayName: 'Download per-region GeoParquet artifacts'
     inputs:
       buildType: 'specific'
       project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
       definition: '6'
-      artifactName: 'addresses-parquet-archives'
-      ${{ if ne(parameters.specificBuildId, '') }}:
+      ${{ if and(ne(parameters.specificBuildId, 'latest'), ne(parameters.specificBuildId, 'auto'), ne(parameters.specificBuildId, '')) }}:
         buildVersionToDownload: 'specific'
         pipelineId: '${{ parameters.specificBuildId }}'
-      ${{ if eq(parameters.specificBuildId, '') }}:
+      ${{ if or(eq(parameters.specificBuildId, 'latest'), eq(parameters.specificBuildId, 'auto'), eq(parameters.specificBuildId, '')) }}:
         buildVersionToDownload: 'latest'
+      itemPattern: 'addresses-parquet-*/**'
       targetPath: '$(System.DefaultWorkingDirectory)/downloads'
 
   - task: Bash@3
@@ -60,37 +60,22 @@ jobs:
         set -e
         mkdir -p release-assets
 
-        # 1. Global combined archive
-        find downloads -name "addresses-parquet-all.tar.gz" -exec cp {} release-assets/ \;
-
-        # 2. Continental archives
-        find downloads -name "addresses-parquet-*.tar.gz" -exec cp {} release-assets/ \;
-
-        # Check if tarball artifacts were found
-        if [ ! -f "release-assets/addresses-parquet-all.tar.gz" ]; then
-          echo "****************************************************************"
-          echo " ERROR: No addresses-parquet-all.tar.gz artifact found in downloads!"
-          echo ""
-          echo " Cause:"
-          echo "   The selected build of pipeline definition 6 (addresses-parquet)"
-          echo "   failed or did not publish its final 'package' stage archives."
-          echo ""
-          echo " Solution:"
-          echo "   Pass the specific successful Build ID (e.g. 248) into the"
-          echo "   'specificBuildId' parameter when launching this release pipeline."
-          echo "****************************************************************"
-          exit 1
-        fi
-
-        # 3. Extract individual per-country GeoParquet files
-        find downloads -name "addresses-parquet-all.tar.gz" | while read -r archive; do
-          tar xfz "$archive" -C release-assets/
-        done
+        # Move all per-region GeoParquet files and clean up temporary download directory
+        find downloads -name "*.addresses.parquet" -exec mv {} release-assets/ \;
+        rm -rf downloads
 
         PARQUET_COUNT=$(find release-assets -name "*.parquet" | wc -l)
         if [ "$PARQUET_COUNT" -eq 0 ]; then
           echo "****************************************************************"
           echo " ERROR: No GeoParquet (.parquet) files were found in downloaded artifacts!"
+          echo ""
+          echo " Cause:"
+          echo "   The selected build of pipeline definition 6 (addresses-parquet)"
+          echo "   failed or did not publish any 'addresses-parquet-*' artifacts."
+          echo ""
+          echo " Solution:"
+          echo "   Pass a successful Build ID into the 'specificBuildId' parameter"
+          echo "   when launching this release pipeline."
           echo "****************************************************************"
           exit 1
         fi
@@ -113,9 +98,7 @@ jobs:
         | **\`geometry\`** | \`GEOMETRY\` | Point geometry (WGS84 EPSG:4326) |
 
         ### Download Assets
-        - **\`addresses-parquet-all.tar.gz\`**: Global combined archive containing all $PARQUET_COUNT per-region GeoParquet files worldwide.
-        - **\`addresses-parquet-<continent>.tar.gz\`**: Continental archives (Europe, Asia, Africa, North America, South America, Central America, Oceania).
-        - **\`<CC>_<region>.addresses.parquet\`**: Individual per-region GeoParquet files for targeted single-country downloads.
+        - **\`<CC>_<region>.addresses.parquet\`**: Individual per-region GeoParquet files ($PARQUET_COUNT files available worldwide).
 
         ---
         *Built with DuckDB spatial extension and ZSTD compression.*
@@ -137,8 +120,8 @@ jobs:
       releaseNotesSource: 'filePath'
       releaseNotesFilePath: '$(System.DefaultWorkingDirectory)/release-notes.md'
       assets: |
-        $(System.DefaultWorkingDirectory)/release-assets/*.tar.gz
         $(System.DefaultWorkingDirectory)/release-assets/*.parquet
       assetUploadMode: 'delete'
       isDraft: ${{ parameters.isDraft }}
       isPreRelease: ${{ parameters.isPreRelease }}
+

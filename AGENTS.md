@@ -22,11 +22,11 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
 1. **Build Pipeline (`azure-pipelines.yml` / `addresses-parquet-pipeline`):**
    - 169 region matrix definitions following Geofabrik hierarchy across 7 continents.
    - Includes single-threaded `warmup` stage that verifies image availability: pulls from `ghcr.io` (primary) with 3 retries, then falls back to `mirror.gcr.io` if GHCR is unavailable. Fails explicitly if both registries fail.
-   - Publishes continental archives (`addresses-parquet-europe.tar.gz`, etc.), global archive (`addresses-parquet-all.tar.gz`), and pre-filtered address PBF artifacts (`addresses-pbf-$(CC)-$(REGION)`).
+   - Publishes individual per-region GeoParquet artifacts (`addresses-parquet-$(CC)-$(REGION)`) and pre-filtered address PBF artifacts (`addresses-pbf-$(CC)-$(REGION)`).
 
 2. **Standalone Manual GitHub Release Pipeline (`azure-pipelines-release.yml` / `addresses-release-pipeline`):**
    - Releases are triggered manually on-demand (`trigger: none`).
-   - Downloads latest build artifacts, packages global (`addresses-parquet-all.tar.gz`), continental (`addresses-parquet-*.tar.gz`), and individual country (`.parquet`) files, and publishes them as GitHub Release assets using service connection `3c34db30-d57b-42e2-a970-857bd932c6c0`.
+   - Downloads latest per-region GeoParquet build artifacts and publishes individual country/region (`<CC>_<region>.addresses.parquet`) files directly as GitHub Release assets using service connection `3c34db30-d57b-42e2-a970-857bd932c6c0`.
 
 ---
 
@@ -56,8 +56,8 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
    - Use conventional commit prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
 7. **English Output Standard:**
    - Log outputs, diagnostic error messages, and pipeline notices must be written strictly in clear English.
-8. **Packaging Stage Dependency Safety (`condition: succeeded()`):**
-   - Packaging and bundling stages (such as `stage: package`) that aggregate artifacts from upstream parallel matrix jobs MUST use `condition: succeeded()`. Never use `condition: always()` on final bundling stages, as cancellation or upstream failure would trigger incomplete artifact archiving.
+8. **Downstream Job Dependency Safety (`condition: succeeded()`):**
+   - Downstream stages or jobs that aggregate artifacts from upstream parallel matrix jobs MUST use `condition: succeeded()`. Never use `condition: always()` on release or bundling steps, as cancellation or upstream failure would trigger incomplete artifact processing.
 9. **Evidence-Based Issue Analysis & Remote DuckDB Diagnostics:**
    - Never make assumptions about dataset contents based solely on commit logs or code inspections. Always gather concrete evidence by directly querying release artifacts using DuckDB with `httpfs` (`duckdb -c "INSTALL httpfs; LOAD httpfs; SELECT ... FROM 'https://github.com/.../releases/download/.../....parquet'"`). Include reproducible diagnostic SQL queries in bug reports and responses.
 10. **Explanation Preceding Git Actions Invariant (Explain First, Commit Second):**

@@ -44,10 +44,10 @@ Data is produced and published by two Azure DevOps pipelines:
    - Downloads cached OSM PBF extracts from the `osm-download` pipeline (definition ID 3).
    - Pre-filters address features via `osmium tags-filter` to conserve disk space.
    - Converts filtered PBFs to ZSTD-compressed GeoParquet via [DuckDB](https://duckdb.org/) spatial extension (`osm2parquet` container).
-   - Packages continental tarballs (`addresses-parquet-europe.tar.gz`, `asia`, `africa`, etc.) and global archive (`addresses-parquet-all.tar.gz`).
+   - Publishes individual per-region GeoParquet artifacts (`addresses-parquet-$(CC)-$(REGION)`).
 2. **`azure-pipelines-release.yml`** (`addresses-release-pipeline`):  
    - Manual GitHub Release pipeline (`trigger: none`).
-   - Downloads latest build artifacts, prepares release notes, and publishes GitHub Release assets (`.tar.gz` archives and individual `.parquet` files).
+   - Downloads latest build artifacts, prepares release notes, and publishes individual per-region GeoParquet files (`.parquet`) as GitHub Release assets.
 
 ## Coverage
 

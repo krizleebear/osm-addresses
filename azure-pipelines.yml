@@ -12,8 +12,8 @@
 #   mirror.gcr.io is retained as fallback in the warmup job.
 #
 # Stages:
+#   warmup  -- Verify container image availability & host disk reclaim
 #   convert -- Per-region PBF -> Parquet conversion (Container-Job-Pattern)
-#   package -- Bundle all per-region Parquet files into a single archive
 trigger: none
 pr: none
 
@@ -941,107 +941,4 @@ stages:
         script: |
           rm -rf $(System.DefaultWorkingDirectory)/*
 
-# ---------------------------------------------------------------------------
-# Stage 3: Bundle all per-region Parquet files into a single archive
-# ---------------------------------------------------------------------------
-- stage: package
-  displayName: 'Package global address GeoParquet archive'
-  dependsOn: convert
-  condition: succeeded()
-
-  jobs:
-  - job: package
-    displayName: 'Bundle Parquet files'
-    timeoutInMinutes: 60
-    workspace:
-      clean: all
-    pool:
-      vmImage: 'ubuntu-latest'
-
-    steps:
-    - checkout: none
-
-    - task: DownloadPipelineArtifact@2
-      enabled: true
-      displayName: 'Download all per-region Parquet artifacts'
-      inputs:
-        buildType: 'current'
-        itemPattern: 'addresses-parquet-*/**'
-        targetPath: '$(System.DefaultWorkingDirectory)/parquet'
-
-    - task: Bash@3
-      enabled: true
-      displayName: 'Bundle continental and global archives'
-      inputs:
-        targetType: 'inline'
-        script: |
-          set -x
-          mkdir -p output/all
-
-          # Flatten: copy all .parquet files into output/all/
-          find parquet -name "*.parquet" -exec cp {} output/all/ \;
-
-          PARQUET_COUNT=$(find output/all -name "*.parquet" | wc -l)
-          if [ "$PARQUET_COUNT" -eq 0 ]; then
-            echo "****************************************************************"
-            echo " ERROR: No GeoParquet files were produced by the convert stage!"
-            echo "****************************************************************"
-            exit 1
-          fi
-
-          echo "[INFO] Found $PARQUET_COUNT GeoParquet file(s)."
-
-          # Continent region lists
-          AFRICA="algeria angola benin botswana burkina-faso burundi cameroon canary-islands cape-verde central-african-republic chad comores congo-brazzaville congo-democratic-republic djibouti egypt equatorial-guinea eritrea ethiopia gabon ghana guinea guinea-bissau ivory-coast kenya lesotho liberia libya madagascar malawi mali mauritania mauritius morocco mozambique namibia niger nigeria rwanda saint-helena-ascension-and-tristan-da-cunha sao-tome-and-principe senegal-and-gambia seychelles sierra-leone somalia south-africa south-sudan sudan swaziland tanzania togo tunisia uganda zambia zimbabwe"
-          ASIA="afghanistan armenia azerbaijan bangladesh bhutan cambodia china gcc-states india indonesia iran iraq israel-and-palestine japan jordan kazakhstan kyrgyzstan laos lebanon malaysia-singapore-brunei maldives mongolia myanmar nepal north-korea pakistan philippines south-korea sri-lanka syria taiwan tajikistan thailand turkmenistan uzbekistan vietnam yemen"
-          AUSTRALIA_OCEANIA="australia fiji new-caledonia new-zealand papua-new-guinea"
-          CENTRAL_AMERICA="bahamas belize cuba guatemala haiti-and-domrep jamaica nicaragua"
-          NORTH_AMERICA="canada greenland mexico us"
-          SOUTH_AMERICA="argentina bolivia brazil chile colombia ecuador guyana paraguay peru suriname uruguay venezuela"
-          EUROPE="albania andorra austria azores belarus belgium bosnia-herzegovina bulgaria croatia cyprus czech-republic denmark estonia faroe-islands finland france georgia germany great-britain greece hungary iceland ireland-and-northern-ireland isle-of-man italy kosovo latvia liechtenstein lithuania luxembourg macedonia malta moldova monaco montenegro netherlands norway poland portugal romania serbia slovakia slovenia spain sweden switzerland turkey ukraine russia"
-
-          bundle_continent() {
-            local continent="$1"
-            shift
-            local regions="$*"
-            mkdir -p "output/$continent"
-            for region in $regions; do
-              find output/all -type f \( -name "*_${region}.addresses.parquet" -o -name "${region}.addresses.parquet" \) -exec cp {} "output/$continent/" \;
-            done
-            local count=$(find "output/$continent" -name "*.parquet" | wc -l)
-            if [ "$count" -gt 0 ]; then
-              echo "[INFO] Creating addresses-parquet-${continent}.tar.gz ($count files)..."
-              tar cfz "addresses-parquet-${continent}.tar.gz" -C "output/$continent" .
-            fi
-          }
-
-          bundle_continent "africa" $AFRICA
-          bundle_continent "asia" $ASIA
-          bundle_continent "australia-oceania" $AUSTRALIA_OCEANIA
-          bundle_continent "central-america" $CENTRAL_AMERICA
-          bundle_continent "north-america" $NORTH_AMERICA
-          bundle_continent "south-america" $SOUTH_AMERICA
-          bundle_continent "europe" $EUROPE
-
-          # Global combined archive
-          echo "[INFO] Creating global addresses-parquet-all.tar.gz ($PARQUET_COUNT files)..."
-          tar cfz addresses-parquet-all.tar.gz -C output/all .
-
-          ls -lh *.tar.gz
-
-    - task: PublishPipelineArtifact@1
-      enabled: true
-      displayName: 'Publish continental and global archives'
-      inputs:
-        targetPath: '$(System.DefaultWorkingDirectory)'
-        artifact: 'addresses-parquet-archives'
-        publishLocation: 'pipeline'
-
-    - task: Bash@3
-      displayName: 'Cleanup workspace'
-      condition: always()
-      inputs:
-        targetType: 'inline'
-        script: |
-          rm -rf $(System.DefaultWorkingDirectory)/*
 
