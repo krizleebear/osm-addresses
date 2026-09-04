@@ -31,12 +31,12 @@ resources:
   # Primary registry: GHCR (no rate limits, no mirror.gcr.io flakiness).
   # Fallback: mirror.gcr.io is attempted in the warmup job for cache pre-warming.
   - container: osm2parquet
-    # krizleebear/osm2parquet:v1.0.7 (standard Docker Schema 2 format)
-    image: ghcr.io/krizleebear/osm2parquet:v1.0.7
+    # krizleebear/osm2parquet:v1.0.8 (standard Docker Schema 2 format)
+    image: ghcr.io/krizleebear/osm2parquet:v1.0.8
 
 stages:
 # ---------------------------------------------------------------------------
-# Stage 1: Verify container image availability
+# Stage 1: Verify container image availability & host disk reclaim
 # Pulls from GHCR (primary). Falls back to mirror.gcr.io if GHCR is
 # unavailable. Fails fast with a clear message if both registries fail.
 # ---------------------------------------------------------------------------
@@ -57,8 +57,8 @@ stages:
         targetType: 'inline'
         script: |
           set -e
-          GHCR_IMAGE="ghcr.io/krizleebear/osm2parquet:v1.0.7"
-          MIRROR_IMAGE="mirror.gcr.io/krizleebear/osm2parquet:v1.0.7"
+          GHCR_IMAGE="ghcr.io/krizleebear/osm2parquet:v1.0.8"
+          MIRROR_IMAGE="mirror.gcr.io/krizleebear/osm2parquet:v1.0.8"
 
           pull_with_retry() {
             local IMAGE="$1"
@@ -96,6 +96,27 @@ stages:
           echo "   Docker Hub, and that mirror.gcr.io has no ongoing outage."
           echo "****************************************************************"
           exit 1
+
+    - task: Bash@3
+      displayName: 'Verify host disk reclaim'
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -e
+          echo "=== DISK SPACE BEFORE RECLAIM ==="
+          df -h /
+          echo ""
+          echo "[INFO] Removing unused pre-installed SDKs (.NET, Android, GHC, Boost, toolcache)..."
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/share/boost \
+            /opt/hostedtoolcache \
+            2>/dev/null || true
+          echo ""
+          echo "=== DISK SPACE AFTER RECLAIM ==="
+          df -h /
 
 # ---------------------------------------------------------------------------
 # Stage 2: Convert PBF -> GeoParquet (per region, parallel matrix)
@@ -795,6 +816,24 @@ stages:
     steps:
 
     - checkout: none
+
+    - task: Bash@3
+      target: host
+      displayName: 'Reclaim runner host disk space'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "[INFO] Disk space before cleanup:"
+          df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/share/boost \
+            /opt/hostedtoolcache \
+            2>/dev/null || true
+          echo "[INFO] Disk space after cleanup:"
+          df -h /
 
     # Download cached PBF from the osm-download pipeline (definition 3).
     # Never fetch directly from Geofabrik here — that is the download pipeline's job.

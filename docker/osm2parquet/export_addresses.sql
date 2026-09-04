@@ -29,7 +29,10 @@ COPY (
         addr_housenumber     AS number,
         addr_postcode        AS postcode,
         addr_city            AS city,
-        ST_PointOnSurface(geom) AS geometry
+        CASE
+            WHEN ST_IsValid(geom) THEN ST_PointOnSurface(geom)
+            ELSE NULL
+        END AS geometry
     FROM ST_Read(
         '__INPUT_PBF__',
         layer        = 'multipolygons',
@@ -37,5 +40,6 @@ COPY (
     )
     WHERE addr_housenumber IS NOT NULL
       AND addr_street      IS NOT NULL
+      AND ST_IsValid(geom)
 
 ) TO '__OUTPUT_PARQUET__' (FORMAT PARQUET, COMPRESSION 'ZSTD');
