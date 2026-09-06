@@ -34,16 +34,11 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
 
 1. **Azure DevOps Job Container Entrypoint Safety:**
    - Docker images intended for Azure DevOps job containers (`container: <image>`) must NOT define an exec-form `ENTRYPOINT` that exits on unknown arguments (such as `ENTRYPOINT ["/app/entrypoint.sh"]`), because Azure DevOps starts job containers with `sleep infinity`. Use `CMD ["/bin/bash"]` in the Dockerfile and invoke processing scripts explicitly in pipeline steps.
-2. **Container Registry Strategy (GHCR primary, `mirror.gcr.io` fallback)**:
-   - The `osm2parquet` container image must be published to **both** registries on every version release:
-     ```bash
-     docker build -t krizleebear/osm2parquet:vX.Y.Z docker/osm2parquet/
-     docker push krizleebear/osm2parquet:vX.Y.Z                        # Docker Hub
-     docker tag  krizleebear/osm2parquet:vX.Y.Z ghcr.io/krizleebear/osm2parquet:vX.Y.Z
-     docker push ghcr.io/krizleebear/osm2parquet:vX.Y.Z               # GHCR (primary)
-     ```
+2. **Container Registry Strategy & Multi-Arch Build Safety (GHCR primary, `mirror.gcr.io` fallback)**:
+   - The `osm2parquet` container image must be built as a multi-architecture image (`linux/amd64` and `linux/arm64`) and published to **both** registries on every version release.
+   - Always build using `./scripts/build_docker.sh vX.Y.Z` or via the GitHub Actions CI workflow (`.github/workflows/docker-publish.yml`). Never run bare `docker build` on ARM64 macOS hosts without explicit multi-platform arguments.
+   - Under the hood, builds MUST use `docker buildx build --platform linux/amd64,linux/arm64 --provenance=false`. The `--provenance=false` flag is mandatory to prevent BuildKit from generating OCI attestation manifests, which cause `unknown blob` 404 errors on `mirror.gcr.io` and manifest mismatch errors on x86-64 Azure DevOps runners.
    - The `resources.containers` image in `azure-pipelines.yml` always references `ghcr.io/krizleebear/osm2parquet:vX.Y.Z` (public, no rate limits, no auth required).
-   - `mirror.gcr.io` is retained only as a warmup-job fallback. Images must be built in Docker Schema 2 format (`docker build`, not `docker buildx build` with provenance) to avoid `unknown blob` errors on `mirror.gcr.io`.
    - The GHCR package (`ghcr.io/krizleebear/osm2parquet`) must remain **public** to allow anonymous pulls from Azure DevOps hosted agents.
 3. **DuckDB Script Template Substitution Invariant:**
    - DuckDB `COPY ... TO` statements require string literal paths. Do not attempt `getvariable()` inside `COPY TO`. Use `sed` token substitution (`__INPUT_PBF__`, `__OUTPUT_PARQUET__`) on SQL templates before piping into `duckdb`.

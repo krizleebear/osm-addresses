@@ -1,7 +1,6 @@
-# Target linux/amd64 explicitly: Azure DevOps ubuntu-latest is x86-64,
-# and the DuckDB CLI is downloaded as the linux-amd64 binary.
-# On Apple Silicon this triggers QEMU emulation in Docker Desktop.
-FROM --platform=linux/amd64 debian:bookworm-slim
+FROM debian:bookworm-slim
+
+ARG TARGETARCH
 
 # Install system dependencies required by GDAL OSM driver and DuckDB spatial extension.
 # All packages are pre-installed here — no runtime apt-get allowed per AGENTS.md rule 7.
@@ -17,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install DuckDB CLI — pinned version for reproducibility
 ARG DUCKDB_VERSION=v1.5.5
 RUN curl -fsSL \
-    "https://github.com/duckdb/duckdb/releases/download/${DUCKDB_VERSION}/duckdb_cli-linux-amd64.zip" \
+    "https://github.com/duckdb/duckdb/releases/download/${DUCKDB_VERSION}/duckdb_cli-linux-${TARGETARCH}.zip" \
     -o /tmp/duckdb.zip \
     && unzip /tmp/duckdb.zip -d /usr/local/bin \
     && rm /tmp/duckdb.zip \
