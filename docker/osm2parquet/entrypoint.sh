@@ -64,7 +64,7 @@ if [ ! -f "$OUTPUT_PARQUET" ]; then
     echo " Cause:  DuckDB completed without error but produced no output."
     echo "         The input PBF may contain no address-tagged features."
     echo " Fix:    Inspect the region's OSM data for addr:housenumber"
-    echo "         and addr:street tags."
+    echo "         and addr:street/addr:place tags."
     echo "****************************************************************"
     exit 1
 fi

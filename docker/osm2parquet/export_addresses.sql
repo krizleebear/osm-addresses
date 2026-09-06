@@ -8,27 +8,27 @@ LOAD spatial;
 COPY (
     -- Node/point features with address tags
     SELECT
-        addr_street     AS street,
-        addr_housenumber AS number,
-        addr_postcode   AS postcode,
-        addr_city       AS city,
-        geom            AS geometry
+        COALESCE(addr_street, addr_place) AS street,
+        addr_housenumber                  AS number,
+        addr_postcode                     AS postcode,
+        addr_city                         AS city,
+        geom                              AS geometry
     FROM ST_Read(
         '__INPUT_PBF__',
         layer        = 'points',
         open_options = ['CONFIG_FILE=/app/osmconf.ini']
     )
     WHERE addr_housenumber IS NOT NULL
-      AND addr_street      IS NOT NULL
+      AND (addr_street IS NOT NULL OR addr_place IS NOT NULL)
 
     UNION ALL
 
     -- Building polygon features: use representative point on surface geometry
     SELECT
-        addr_street          AS street,
-        addr_housenumber     AS number,
-        addr_postcode        AS postcode,
-        addr_city            AS city,
+        COALESCE(addr_street, addr_place) AS street,
+        addr_housenumber                  AS number,
+        addr_postcode                     AS postcode,
+        addr_city                         AS city,
         CASE
             WHEN ST_IsValid(geom) THEN ST_PointOnSurface(geom)
             ELSE NULL
@@ -39,7 +39,7 @@ COPY (
         open_options = ['CONFIG_FILE=/app/osmconf.ini']
     )
     WHERE addr_housenumber IS NOT NULL
-      AND addr_street      IS NOT NULL
+      AND (addr_street IS NOT NULL OR addr_place IS NOT NULL)
       AND ST_IsValid(geom)
 
 ) TO '__OUTPUT_PARQUET__' (FORMAT PARQUET, COMPRESSION 'ZSTD');

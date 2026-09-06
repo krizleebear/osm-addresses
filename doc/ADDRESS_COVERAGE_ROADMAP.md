@@ -23,11 +23,11 @@ According to OpenStreetMap Taginfo statistics (August 2026), address tags exhibi
 
 ## 2. Identified Coverage Gaps & Potential Enhancements
 
-### A. Place Name Fallback (`addr:place`)
+### A. Place Name Fallback (`addr:place`) — [Implemented in v1.0.9]
 * **Context:** In many rural regions, villages, hamlets, and islands (e.g., in Germany, Spain, Japan, the UK), addresses do not have dedicated street names. Instead, houses are numbered directly relative to the place or hamlet name (e.g., `addr:housenumber=4`, `addr:place=Einöde`).
 * **Impact:** Globally, **~11.7 million addresses** currently rely on `addr:place`.
-* **Current Filter Behavior:** Filter conditions requiring `addr:street IS NOT NULL` omit these addresses.
-* **Proposed Enhancement:** Allow `COALESCE(addr_street, addr_place)` as the `street` column, or add a dedicated `place` column.
+* **Implementation:** `addr:place` is extracted in `osmconf.ini` and mapped via `COALESCE(addr_street, addr_place) AS street` in `export_addresses.sql`, preserving the output schema while ensuring addresses in hamlets and settlements are retained.
+
 
 ### B. Address Interpolation (`addr:interpolation`)
 * **Context:** In areas where individual building footprints and house numbers have not yet been mapped, OSM mappers connect start and end address nodes using an interpolation line (`way`).
