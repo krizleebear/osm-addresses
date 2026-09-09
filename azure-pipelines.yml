@@ -22,6 +22,10 @@ parameters:
   displayName: 'Skip Osmium filtering (use pre-filtered addresses.pbf pipeline artifacts)'
   type: boolean
   default: false
+- name: downloadBuildId
+  displayName: 'Specific build ID of osm-download-pbf pipeline (definition 9) or latest'
+  type: string
+  default: 'latest'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -859,20 +863,33 @@ stages:
           echo "[INFO] Disk space after cleanup:"
           df -h /
 
-    # Download cached PBF from the osm-download pipeline (definition 3).
+    # Download cached PBF from the osm-download pipeline (definition 9: krizleebear.osm-download-pbf).
     # Never fetch directly from Geofabrik here — that is the download pipeline's job.
     # Download raw PBF from osm-download pipeline when skipOsmiumFilter is false
-    - task: DownloadPipelineArtifact@2
-      enabled: true
-      displayName: 'Download cached OSM PBF (from osm-download pipeline)'
-      condition: ${{ eq(parameters.skipOsmiumFilter, false) }}
-      inputs:
-        buildType: 'specific'
-        project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
-        definition: '3'
-        buildVersionToDownload: 'latest'
-        artifactName: 'osm-data-$(OSM_REGION)'
-        targetPath: '$(System.DefaultWorkingDirectory)'
+    - ${{ if or(eq(parameters.downloadBuildId, 'latest'), eq(parameters.downloadBuildId, 'auto')) }}:
+      - task: DownloadPipelineArtifact@2
+        enabled: true
+        displayName: 'Download cached OSM PBF (from osm-download pipeline - latest)'
+        condition: ${{ eq(parameters.skipOsmiumFilter, false) }}
+        inputs:
+          buildType: 'specific'
+          project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
+          definition: '9'
+          buildVersionToDownload: 'latest'
+          artifactName: 'osm-data-$(OSM_REGION)'
+          targetPath: '$(System.DefaultWorkingDirectory)'
+    - ${{ if not(or(eq(parameters.downloadBuildId, 'latest'), eq(parameters.downloadBuildId, 'auto'))) }}:
+      - task: DownloadPipelineArtifact@2
+        enabled: true
+        displayName: 'Download cached OSM PBF (from osm-download pipeline - build ${{ parameters.downloadBuildId }})'
+        condition: ${{ eq(parameters.skipOsmiumFilter, false) }}
+        inputs:
+          buildType: 'specific'
+          project: 'f85b0393-1484-487a-b6d1-5120b54a70be'
+          pipeline: '9'
+          buildId: '${{ parameters.downloadBuildId }}'
+          artifactName: 'osm-data-$(OSM_REGION)'
+          targetPath: '$(System.DefaultWorkingDirectory)'
 
     # Download pre-filtered address PBF artifact when skipOsmiumFilter is true
     - task: DownloadPipelineArtifact@2
