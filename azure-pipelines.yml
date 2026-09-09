@@ -681,6 +681,26 @@ stages:
           OSM_REGION: 'france'
           PBF_URL: 'https://download.geofabrik.de/europe/france-latest.osm.pbf'
           COUNTRY_CODE: 'FR'
+        guadeloupe:
+          OSM_REGION: 'guadeloupe'
+          PBF_URL: 'https://download.geofabrik.de/europe/france/guadeloupe-latest.osm.pbf'
+          COUNTRY_CODE: 'GP'
+        martinique:
+          OSM_REGION: 'martinique'
+          PBF_URL: 'https://download.geofabrik.de/europe/france/martinique-latest.osm.pbf'
+          COUNTRY_CODE: 'MQ'
+        guyane:
+          OSM_REGION: 'guyane'
+          PBF_URL: 'https://download.geofabrik.de/europe/france/guyane-latest.osm.pbf'
+          COUNTRY_CODE: 'GF'
+        reunion:
+          OSM_REGION: 'reunion'
+          PBF_URL: 'https://download.geofabrik.de/europe/france/reunion-latest.osm.pbf'
+          COUNTRY_CODE: 'RE'
+        mayotte:
+          OSM_REGION: 'mayotte'
+          PBF_URL: 'https://download.geofabrik.de/europe/france/mayotte-latest.osm.pbf'
+          COUNTRY_CODE: 'YT'
         georgia:
           OSM_REGION: 'georgia'
           PBF_URL: 'https://download.geofabrik.de/europe/georgia-latest.osm.pbf'
