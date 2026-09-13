@@ -955,7 +955,7 @@ stages:
           fi
 
           echo "[INFO] Converting filtered PBF to GeoParquet via DuckDB..."
-          /app/entrypoint.sh "$FILTERED_PBF" "$OUTPUT_PARQUET"
+          /app/entrypoint.sh "$FILTERED_PBF" "$OUTPUT_PARQUET" "$(COUNTRY_CODE)"
 
     - task: PublishPipelineArtifact@1
       enabled: true

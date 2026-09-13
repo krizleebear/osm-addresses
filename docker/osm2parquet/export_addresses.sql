@@ -42,4 +42,23 @@ COPY (
       AND (addr_street IS NOT NULL OR addr_place IS NOT NULL)
       AND ST_IsValid(geom)
 
-) TO '__OUTPUT_PARQUET__' (FORMAT PARQUET, COMPRESSION 'ZSTD');
+) TO '__OUTPUT_PARQUET__' (
+    FORMAT PARQUET,
+    COMPRESSION 'ZSTD',
+    KV_METADATA {
+        'source': 'OpenStreetMap',
+        'origin': 'OpenStreetMap (https://www.openstreetmap.org)',
+        'dataset': 'OpenStreetMap Addresses',
+        'attribution': '© OpenStreetMap contributors',
+        'attribution_url': 'https://www.openstreetmap.org/copyright',
+        'license': 'ODbL-1.0 (https://opendatacommons.org/licenses/odbl/)',
+        'license_url': 'https://opendatacommons.org/licenses/odbl/',
+        'copyright': 'Data © OpenStreetMap contributors, licensed under Open Data Commons Open Database License 1.0 (ODbL)',
+        'schema': 'https://github.com/krizleebear/osm-addresses',
+        'schema_url': 'https://github.com/krizleebear/osm-addresses',
+        'compiler': 'osm-addresses (https://github.com/krizleebear/osm-addresses)',
+        'country_code': '__COUNTRY_CODE__',
+        'exported_at': '__EXPORTED_AT__'
+    }
+);
+

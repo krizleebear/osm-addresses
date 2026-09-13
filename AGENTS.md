@@ -57,5 +57,22 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
    - Never make assumptions about dataset contents based solely on commit logs or code inspections. Always gather concrete evidence by directly querying release artifacts using DuckDB with `httpfs` (`duckdb -c "INSTALL httpfs; LOAD httpfs; SELECT ... FROM 'https://github.com/.../releases/download/.../....parquet'"`). Include reproducible diagnostic SQL queries in bug reports and responses.
 10. **Explanation Preceding Git Actions Invariant (Explain First, Commit Second):**
     - The agent must always first output a clear, comprehensive explanation of the diagnosis, the rationale, and the exact changes in the visible response text before requesting permission or attempting to execute `git commit`, `git push`, or pipeline triggers. Never trigger permission prompts for Git actions without the user having seen the complete explanatory context first.
+11. **Parquet Provenance & License Metadata Invariant:**
+    - All GeoParquet files produced by `osm2parquet` (`export_addresses.sql`) MUST embed standard provenance, copyright, and licensing metadata in the Parquet file footer via DuckDB's `KV_METADATA` option.
+    - Required metadata keys:
+      - `source`: `OpenStreetMap`
+      - `origin`: `OpenStreetMap (https://www.openstreetmap.org)`
+      - `dataset`: `OpenStreetMap Addresses`
+      - `attribution`: `© OpenStreetMap contributors`
+      - `attribution_url`: `https://www.openstreetmap.org/copyright`
+      - `license`: `ODbL-1.0 (https://opendatacommons.org/licenses/odbl/)`
+      - `license_url`: `https://opendatacommons.org/licenses/odbl/`
+      - `copyright`: `Data © OpenStreetMap contributors, licensed under Open Data Commons Open Database License 1.0 (ODbL)`
+      - `schema`: `https://github.com/krizleebear/osm-addresses`
+      - `schema_url`: `https://github.com/krizleebear/osm-addresses`
+      - `compiler`: `osm-addresses (https://github.com/krizleebear/osm-addresses)`
+      - `country_code`: 2-letter ISO code or territory identifier (e.g. `DE`, `US`)
+      - `exported_at`: ISO-8601 UTC timestamp (e.g. `YYYY-MM-DDTHH:MM:SSZ`)
+
 
 

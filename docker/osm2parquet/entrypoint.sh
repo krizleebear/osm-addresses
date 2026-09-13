@@ -9,13 +9,21 @@ set -e
 
 INPUT_PBF="$1"
 OUTPUT_PARQUET="$2"
+COUNTRY_CODE="${3:-${COUNTRY_CODE:-}}"
+
+# If COUNTRY_CODE is still empty, derive it from output filename (e.g. DE_germany.addresses.parquet -> DE)
+if [ -z "$COUNTRY_CODE" ]; then
+    BASE_NAME="$(basename "$OUTPUT_PARQUET")"
+    COUNTRY_CODE="$(echo "$BASE_NAME" | cut -d_ -f1)"
+fi
+[ -z "$COUNTRY_CODE" ] && COUNTRY_CODE="unknown"
 
 # --- Input validation (fail fast with diagnostic message) ---
 if [ -z "$INPUT_PBF" ] || [ -z "$OUTPUT_PARQUET" ]; then
     echo "****************************************************************"
     echo " ERROR: Missing required arguments."
     echo ""
-    echo " Usage:  /app/entrypoint.sh <input.osm.pbf> <output.addresses.parquet>"
+    echo " Usage:  /app/entrypoint.sh <input.osm.pbf> <output.addresses.parquet> [country_code]"
     echo ""
     echo " Cause:  One or both CLI arguments were not supplied."
     echo " Fix:    Ensure the pipeline step passes INPUT_PBF and OUTPUT_PARQUET."
@@ -37,9 +45,11 @@ if [ ! -f "$INPUT_PBF" ]; then
 fi
 
 # --- Execution ---
-echo "[INFO] Input  : $INPUT_PBF ($(du -sh "$INPUT_PBF" | cut -f1))"
-echo "[INFO] Output : $OUTPUT_PARQUET"
+echo "[INFO] Input       : $INPUT_PBF ($(du -sh "$INPUT_PBF" | cut -f1))"
+echo "[INFO] Output      : $OUTPUT_PARQUET"
+echo "[INFO] Country Code: $COUNTRY_CODE"
 START_TIME=$(date +%s)
+EXPORTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Substitute placeholder tokens with actual paths, then pipe to duckdb stdin.
 # getvariable() cannot be used in COPY TO (requires string literal) — sed
@@ -48,6 +58,8 @@ TMP_SQL=$(mktemp /tmp/export_XXXXXX.sql)
 sed \
   -e "s|__INPUT_PBF__|${INPUT_PBF}|g" \
   -e "s|__OUTPUT_PARQUET__|${OUTPUT_PARQUET}|g" \
+  -e "s|__COUNTRY_CODE__|${COUNTRY_CODE}|g" \
+  -e "s|__EXPORTED_AT__|${EXPORTED_AT}|g" \
   /app/export_addresses.sql > "$TMP_SQL"
 
 duckdb < "$TMP_SQL"
