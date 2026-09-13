@@ -843,7 +843,7 @@ stages:
           COUNTRY_CODE: 'UA'
     steps:
 
-    - checkout: none
+    - checkout: self
 
     - task: Bash@3
       target: host
@@ -955,7 +955,8 @@ stages:
           fi
 
           echo "[INFO] Converting filtered PBF to GeoParquet via DuckDB..."
-          /app/entrypoint.sh "$FILTERED_PBF" "$OUTPUT_PARQUET" "$(COUNTRY_CODE)"
+          chmod +x docker/osm2parquet/entrypoint.sh
+          ./docker/osm2parquet/entrypoint.sh "$FILTERED_PBF" "$OUTPUT_PARQUET" "$(COUNTRY_CODE)"
 
     - task: PublishPipelineArtifact@1
       enabled: true

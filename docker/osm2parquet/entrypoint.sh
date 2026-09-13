@@ -51,6 +51,15 @@ echo "[INFO] Country Code: $COUNTRY_CODE"
 START_TIME=$(date +%s)
 EXPORTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+# --- Script and Config Resolution ---
+# Prefer scripts and config from mounted workspace (Git repo); fallback to container image /app
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SQL_TEMPLATE="${SCRIPT_DIR}/export_addresses.sql"
+[ ! -f "$SQL_TEMPLATE" ] && SQL_TEMPLATE="/app/export_addresses.sql"
+
+OSMCONF="${SCRIPT_DIR}/osmconf.ini"
+[ ! -f "$OSMCONF" ] && OSMCONF="/app/osmconf.ini"
+
 # Substitute placeholder tokens with actual paths, then pipe to duckdb stdin.
 # getvariable() cannot be used in COPY TO (requires string literal) — sed
 # substitution embeds the paths as literals before DuckDB sees the SQL.
@@ -60,7 +69,8 @@ sed \
   -e "s|__OUTPUT_PARQUET__|${OUTPUT_PARQUET}|g" \
   -e "s|__COUNTRY_CODE__|${COUNTRY_CODE}|g" \
   -e "s|__EXPORTED_AT__|${EXPORTED_AT}|g" \
-  /app/export_addresses.sql > "$TMP_SQL"
+  -e "s|/app/osmconf.ini|${OSMCONF}|g" \
+  "$SQL_TEMPLATE" > "$TMP_SQL"
 
 duckdb < "$TMP_SQL"
 rm -f "$TMP_SQL"
