@@ -2,17 +2,13 @@ name: Build and Publish osm2parquet Container
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'docker/osm2parquet/**'
-      - '.github/workflows/docker-publish.yml'
     tags:
+      - 'docker-v*.*.*'
       - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Image tag version (e.g. v1.0.9, defaults to version from azure-pipelines.yml)'
+        description: 'Image tag version (e.g. v1.0.10, defaults to version from azure-pipelines.yml)'
         required: false
         type: string
 
@@ -32,6 +28,8 @@ jobs:
         run: |
           if [ -n "${{ inputs.version }}" ]; then
             TAG="${{ inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/docker-v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/docker-}"
           elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
           else
