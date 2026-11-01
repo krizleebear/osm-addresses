@@ -46,17 +46,31 @@ COPY (
           )
           OR (
               highway = 'pedestrian'
-              AND COALESCE(access, motor_vehicle, motorcar) IN ('destination', 'delivery', 'yes', 'permissive')
+              AND (
+                  name IS NOT NULL
+                  OR COALESCE(access, motor_vehicle, motorcar) IN ('destination', 'delivery', 'yes', 'permissive')
+                  OR COALESCE(delivery, '') IN ('yes', 'destination')
+                  OR other_tags ILIKE '%delivery%'
+              )
           )
           OR (
               highway = 'track'
               AND name IS NOT NULL
           )
       )
-      -- Exclude sections where motor vehicular access is prohibited
-      AND (access IS NULL OR access NOT IN ('no'))
-      AND (motor_vehicle IS NULL OR motor_vehicle NOT IN ('no'))
-      AND (motorcar IS NULL OR motorcar NOT IN ('no'))
+      -- Exclude sections where motor vehicular access is prohibited, EXCEPT for named streets
+      -- (which serve as postal and physical street axes for addresses) and delivery/vehicular access streets.
+      AND (
+          name IS NOT NULL
+          OR COALESCE(access, motor_vehicle, motorcar) IN ('destination', 'delivery', 'yes', 'permissive')
+          OR COALESCE(delivery, '') IN ('yes', 'destination')
+          OR other_tags ILIKE '%delivery%'
+          OR (
+              (access IS NULL OR access NOT IN ('no'))
+              AND (motor_vehicle IS NULL OR motor_vehicle NOT IN ('no'))
+              AND (motorcar IS NULL OR motorcar NOT IN ('no'))
+          )
+      )
     ORDER BY ST_Hilbert(ST_Centroid(geom), ST_Extent(ST_MakeEnvelope(-180.0, -90.0, 180.0, 90.0)))
 ) TO '__OUTPUT_PARQUET__' (
     FORMAT PARQUET,

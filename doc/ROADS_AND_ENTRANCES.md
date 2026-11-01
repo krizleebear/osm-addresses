@@ -72,10 +72,16 @@ Erfasst das routing-relevante, für Kraftfahrzeuge befahrbare Straßennetzwerk.
           'living_street',
           'service'
       )
-      -- Fußgängerzonen mit Lieferverkehr / Anliegerzufahrt einbeziehen:
+      -- Fußgängerzonen einbeziehen: alle benannten Fußgängerzonen (postalische/physische Straßenachse)
+      -- sowie unbenannte Abschnitte mit Lieferverkehr / Anliegerzufahrt:
       OR (
           highway = 'pedestrian'
-          AND COALESCE(access, motor_vehicle, motorcar) IN ('destination', 'delivery', 'yes', 'permissive')
+          AND (
+              name IS NOT NULL
+              OR COALESCE(access, motor_vehicle, motorcar) IN ('destination', 'delivery', 'yes', 'permissive')
+              OR COALESCE(delivery, '') IN ('yes', 'destination')
+              OR other_tags ILIKE '%delivery%'
+          )
       )
       -- Benannte Wirtschaftswege einbeziehen (Anbindung ländlicher Adressen):
       OR (
@@ -88,7 +94,7 @@ Erfasst das routing-relevante, für Kraftfahrzeuge befahrbare Straßennetzwerk.
   - **Keine reinen Fuß-/Radwege:** `footway`, `cycleway`, `path`, `steps`, `bridleway`, `corridor`, `elevator`, `platform`.
   - **Keine Autobahnen:** `motorway`, `motorway_link` (Adressen besitzen keine direkten Haltepunkte auf Autobahnen).
   - **Keine Bau-/Planungsstraßen:** `construction`, `proposed`, `abandoned`, `raceway`.
-  - **Kraftfahrzeug-Zugangsbeschränkungen:** Abschnitte mit `access = 'no'`, `motor_vehicle = 'no'` oder `motorcar = 'no'` ausschließen (außer bei expliziter Freigabe wie `destination`/`delivery`).
+  - **Kraftfahrzeug-Zugangsbeschränkungen:** Abschnitte mit `access = 'no'`, `motor_vehicle = 'no'` oder `motorcar = 'no'` ausschließen — **außer** bei benannten Straßen (`name IS NOT NULL`, da diese als postalische Straßenachse für Adresspunkte dienen) oder bei expliziter Liefer-/Anliegerfreigabe (`delivery`, `destination` etc.).
 
 ---
 

@@ -209,6 +209,14 @@ class TestOsmconfConfiguration(unittest.TestCase):
         attributes = [a.strip() for a in self.config.get("lines", "attributes").split(",")]
         self.assertIn("waterway", attributes, "osmconf.ini [lines] must expose 'waterway' attribute")
 
+    def test_lines_enables_delivery(self):
+        self.assertTrue(
+            self.config.has_section("lines"),
+            "osmconf.ini must have a [lines] section",
+        )
+        attributes = [a.strip() for a in self.config.get("lines", "attributes").split(",")]
+        self.assertIn("delivery", attributes, "osmconf.ini [lines] must expose 'delivery' attribute")
+
     def test_lines_enables_other_tags(self):
         self.assertTrue(
             self.config.has_section("lines"),
@@ -339,6 +347,110 @@ class TestConvertScriptInvariants(unittest.TestCase):
             self.script_content,
             "convert.sh must export OSM_COMPRESS_NODES with default YES",
         )
+
+
+class TestRoadsSqlInvariants(unittest.TestCase):
+    """Invariants for roads export: named pedestrian streets, delivery access, and column projection."""
+
+    def setUp(self):
+        sql_path = os.path.join(REPO_ROOT, "scripts", "export_roads.sql")
+        self.sql_content = read_file(sql_path)
+
+    def test_roads_sql_selects_expected_columns(self):
+        for col in ("osm_id", "osm_type", "name", "highway", "oneway", "service", "bbox_minx", "bbox_miny", "bbox_maxx", "bbox_maxy", "geometry"):
+            self.assertIn(col, self.sql_content, f"export_roads.sql must project '{col}' column")
+
+    def test_roads_sql_includes_named_pedestrian_and_delivery(self):
+        self.assertIn("highway = 'pedestrian'", self.sql_content, "export_roads.sql must handle highway = 'pedestrian'")
+        self.assertIn("name IS NOT NULL", self.sql_content, "export_roads.sql must include named streets")
+        self.assertIn("delivery", self.sql_content, "export_roads.sql must check delivery attribute")
+        self.assertIn("other_tags ILIKE '%delivery%'", self.sql_content, "export_roads.sql must check conditional/other delivery tags")
+
+    def test_roads_sql_filter_logic_execution(self):
+        import shutil
+        import subprocess
+        import json
+
+        if not shutil.which("duckdb"):
+            self.skipTest("duckdb CLI not available on host")
+
+        # Test query verifying that named pedestrian streets and delivery roads pass the filter
+        test_query = """
+        WITH mock_lines AS (
+            SELECT 1 AS osm_id, 'Kaufingerstraße' AS name, 'pedestrian' AS highway, NULL AS access, 'no' AS motor_vehicle, NULL AS motorcar, NULL AS delivery, NULL AS other_tags UNION ALL
+            SELECT 2, 'Zeil', 'pedestrian', 'no', 'no', NULL, 'yes', NULL UNION ALL
+            SELECT 3, 'Schulstraße', 'pedestrian', 'no', 'no', NULL, NULL, '"motor_vehicle:conditional"=>"delivery @ (06:00-11:00)"' UNION ALL
+            SELECT 4, NULL, 'pedestrian', 'no', 'no', NULL, NULL, '"motor_vehicle:conditional"=>"delivery @ (06:00-11:00)"' UNION ALL
+            SELECT 5, NULL, 'pedestrian', 'no', 'no', NULL, NULL, NULL UNION ALL
+            SELECT 6, 'Amselweg', 'track', NULL, NULL, NULL, NULL, NULL UNION ALL
+            SELECT 7, NULL, 'track', NULL, NULL, NULL, NULL, NULL UNION ALL
+            SELECT 8, 'Hauptstraße', 'residential', NULL, 'no', NULL, NULL, NULL UNION ALL
+            SELECT 9, NULL, 'service', 'no', 'no', NULL, NULL, NULL UNION ALL
+            SELECT 10, 'Gartenweg', 'residential', NULL, NULL, NULL, NULL, NULL
+        )
+        SELECT osm_id, name, highway
+        FROM mock_lines
+        WHERE (
+            highway IN (
+                'residential', 'unclassified', 'tertiary', 'tertiary_link',
+                'secondary', 'secondary_link', 'primary', 'primary_link',
+                'trunk', 'trunk_link', 'living_street', 'service'
+            )
+            OR (
+                highway = 'pedestrian'
+                AND (
+                    name IS NOT NULL
+                    OR COALESCE(access, motor_vehicle, motorcar) IN ('destination', 'delivery', 'yes', 'permissive')
+                    OR COALESCE(delivery, '') IN ('yes', 'destination')
+                    OR other_tags ILIKE '%delivery%'
+                )
+            )
+            OR (
+                highway = 'track'
+                AND name IS NOT NULL
+            )
+        )
+        AND (
+            name IS NOT NULL
+            OR COALESCE(access, motor_vehicle, motorcar) IN ('destination', 'delivery', 'yes', 'permissive')
+            OR COALESCE(delivery, '') IN ('yes', 'destination')
+            OR other_tags ILIKE '%delivery%'
+            OR (
+                (access IS NULL OR access NOT IN ('no'))
+                AND (motor_vehicle IS NULL OR motor_vehicle NOT IN ('no'))
+                AND (motorcar IS NULL OR motorcar NOT IN ('no'))
+            )
+        )
+        ORDER BY osm_id;
+        """
+        proc = subprocess.run(
+            ["duckdb", "-light-mode", "-no-stdin", "-json", "-c", test_query],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        rows = json.loads(proc.stdout)
+        included_ids = [r["osm_id"] for r in rows]
+        # 1: named pedestrian with motor_vehicle=no -> INCLUDED
+        self.assertIn(1, included_ids)
+        # 2: named pedestrian with delivery=yes -> INCLUDED
+        self.assertIn(2, included_ids)
+        # 3: named pedestrian with conditional delivery in other_tags -> INCLUDED
+        self.assertIn(3, included_ids)
+        # 4: unnamed pedestrian with conditional delivery -> INCLUDED
+        self.assertIn(4, included_ids)
+        # 5: unnamed pedestrian with motor_vehicle=no, no delivery -> EXCLUDED
+        self.assertNotIn(5, included_ids)
+        # 6: named track -> INCLUDED
+        self.assertIn(6, included_ids)
+        # 7: unnamed track -> EXCLUDED
+        self.assertNotIn(7, included_ids)
+        # 8: named residential with motor_vehicle=no -> INCLUDED
+        self.assertIn(8, included_ids)
+        # 9: unnamed service with access=no -> EXCLUDED
+        self.assertNotIn(9, included_ids)
+        # 10: normal residential -> INCLUDED
+        self.assertIn(10, included_ids)
 
 
 class TestWaterwaysSqlInvariants(unittest.TestCase):
