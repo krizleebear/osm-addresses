@@ -83,15 +83,15 @@ Erfasst das routing-relevante, für Kraftfahrzeuge befahrbare Straßennetzwerk.
               OR other_tags ILIKE '%delivery%'
           )
       )
-      -- Benannte Wirtschaftswege einbeziehen (Anbindung ländlicher Adressen):
+      -- Benannte Wege einbeziehen (Wirtschaftswege, Pfade, Fuß- und Radwege mit Adressbezug wie Bürgerwohlsweg):
       OR (
-          highway = 'track'
+          highway IN ('track', 'path', 'footway', 'cycleway')
           AND name IS NOT NULL
       )
   )
   ```
 * **Ausschluss (Blacklist):**
-  - **Keine reinen Fuß-/Radwege:** `footway`, `cycleway`, `path`, `steps`, `bridleway`, `corridor`, `elevator`, `platform`.
+  - **Keine unbenannten Fuß-/Radwege:** Unbenannte `footway`, `cycleway`, `path`, sowie generell `steps`, `bridleway`, `corridor`, `elevator`, `platform`.
   - **Keine Autobahnen:** `motorway`, `motorway_link` (Adressen besitzen keine direkten Haltepunkte auf Autobahnen).
   - **Keine Bau-/Planungsstraßen:** `construction`, `proposed`, `abandoned`, `raceway`.
   - **Kraftfahrzeug-Zugangsbeschränkungen:** Abschnitte mit `access = 'no'`, `motor_vehicle = 'no'` oder `motorcar = 'no'` ausschließen — **außer** bei benannten Straßen (`name IS NOT NULL`, da diese als postalische Straßenachse für Adresspunkte dienen) oder bei expliziter Liefer-/Anliegerfreigabe (`delivery`, `destination` etc.).

@@ -365,6 +365,8 @@ class TestRoadsSqlInvariants(unittest.TestCase):
         self.assertIn("name IS NOT NULL", self.sql_content, "export_roads.sql must include named streets")
         self.assertIn("delivery", self.sql_content, "export_roads.sql must check delivery attribute")
         self.assertIn("other_tags ILIKE '%delivery%'", self.sql_content, "export_roads.sql must check conditional/other delivery tags")
+        for hw in ("track", "path", "footway", "cycleway"):
+            self.assertIn(f"'{hw}'", self.sql_content, f"export_roads.sql must support named '{hw}'")
 
     def test_roads_sql_filter_logic_execution(self):
         import shutil
@@ -374,7 +376,7 @@ class TestRoadsSqlInvariants(unittest.TestCase):
         if not shutil.which("duckdb"):
             self.skipTest("duckdb CLI not available on host")
 
-        # Test query verifying that named pedestrian streets and delivery roads pass the filter
+        # Test query verifying that named pedestrian streets, delivery roads, and named footways/paths pass the filter
         test_query = """
         WITH mock_lines AS (
             SELECT 1 AS osm_id, 'Kaufingerstraße' AS name, 'pedestrian' AS highway, NULL AS access, 'no' AS motor_vehicle, NULL AS motorcar, NULL AS delivery, NULL AS other_tags UNION ALL
@@ -386,7 +388,13 @@ class TestRoadsSqlInvariants(unittest.TestCase):
             SELECT 7, NULL, 'track', NULL, NULL, NULL, NULL, NULL UNION ALL
             SELECT 8, 'Hauptstraße', 'residential', NULL, 'no', NULL, NULL, NULL UNION ALL
             SELECT 9, NULL, 'service', 'no', 'no', NULL, NULL, NULL UNION ALL
-            SELECT 10, 'Gartenweg', 'residential', NULL, NULL, NULL, NULL, NULL
+            SELECT 10, 'Gartenweg', 'residential', NULL, NULL, NULL, NULL, NULL UNION ALL
+            SELECT 11, 'Bürgerwohlsweg', 'footway', 'no', 'no', NULL, NULL, NULL UNION ALL
+            SELECT 12, NULL, 'footway', NULL, NULL, NULL, NULL, NULL UNION ALL
+            SELECT 13, 'Goetheweg', 'path', NULL, 'no', NULL, NULL, NULL UNION ALL
+            SELECT 14, NULL, 'path', NULL, NULL, NULL, NULL, NULL UNION ALL
+            SELECT 15, 'Radbahn', 'cycleway', NULL, 'no', NULL, NULL, NULL UNION ALL
+            SELECT 16, NULL, 'cycleway', NULL, NULL, NULL, NULL, NULL
         )
         SELECT osm_id, name, highway
         FROM mock_lines
@@ -406,7 +414,7 @@ class TestRoadsSqlInvariants(unittest.TestCase):
                 )
             )
             OR (
-                highway = 'track'
+                highway IN ('track', 'path', 'footway', 'cycleway')
                 AND name IS NOT NULL
             )
         )
@@ -451,6 +459,18 @@ class TestRoadsSqlInvariants(unittest.TestCase):
         self.assertNotIn(9, included_ids)
         # 10: normal residential -> INCLUDED
         self.assertIn(10, included_ids)
+        # 11: named footway (Bürgerwohlsweg) -> INCLUDED
+        self.assertIn(11, included_ids)
+        # 12: unnamed footway -> EXCLUDED
+        self.assertNotIn(12, included_ids)
+        # 13: named path (Goetheweg) -> INCLUDED
+        self.assertIn(13, included_ids)
+        # 14: unnamed path -> EXCLUDED
+        self.assertNotIn(14, included_ids)
+        # 15: named cycleway (Radbahn) -> INCLUDED
+        self.assertIn(15, included_ids)
+        # 16: unnamed cycleway -> EXCLUDED
+        self.assertNotIn(16, included_ids)
 
 
 class TestWaterwaysSqlInvariants(unittest.TestCase):

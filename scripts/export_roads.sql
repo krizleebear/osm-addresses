@@ -54,7 +54,7 @@ COPY (
               )
           )
           OR (
-              highway = 'track'
+              highway IN ('track', 'path', 'footway', 'cycleway')
               AND name IS NOT NULL
           )
       )

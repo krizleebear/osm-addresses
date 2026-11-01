@@ -1056,7 +1056,7 @@ stages:
 
             echo "[INFO] Filtering road features via osmium..."
             osmium tags-filter "$INPUT_PBF" \
-              w/highway=residential,unclassified,tertiary,tertiary_link,secondary,secondary_link,primary,primary_link,trunk,trunk_link,living_street,service,pedestrian,track \
+              w/highway=residential,unclassified,tertiary,tertiary_link,secondary,secondary_link,primary,primary_link,trunk,trunk_link,living_street,service,pedestrian,track,path,footway,cycleway \
               -o "$ROADS_PBF" --overwrite
 
             echo "[INFO] Filtering entrance features via osmium..."
