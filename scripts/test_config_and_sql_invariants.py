@@ -646,6 +646,15 @@ class TestSpatialOptimizationInvariants(unittest.TestCase):
                 f"{basename} must order output by bounded ST_Hilbert(..., ST_Extent(ST_MakeEnvelope(...))) for accurate spatial clustering without window buffering overhead",
             )
 
+    def test_sql_templates_do_not_use_planar_centroid(self):
+        # Planar ST_Centroid lands far from antimeridian-split geometries (e.g. Taveuni, FJ).
+        for template_path in SQL_TEMPLATES:
+            self.assertNotIn(
+                "ST_Centroid",
+                read_file(template_path),
+                f"{os.path.basename(template_path)} must use ST_PointOnSurface instead of ST_Centroid",
+            )
+
     def test_roads_sql_projects_bbox_columns(self):
         roads_sql = read_file(os.path.join(REPO_ROOT, "scripts", "export_roads.sql"))
         for col in ("bbox_minx", "bbox_miny", "bbox_maxx", "bbox_maxy"):

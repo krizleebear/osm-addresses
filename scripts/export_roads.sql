@@ -71,7 +71,7 @@ COPY (
               AND (motorcar IS NULL OR motorcar NOT IN ('no'))
           )
       )
-    ORDER BY ST_Hilbert(ST_Centroid(geom), ST_Extent(ST_MakeEnvelope(-180.0, -90.0, 180.0, 90.0)))
+    ORDER BY ST_Hilbert(ST_PointOnSurface(geom), ST_Extent(ST_MakeEnvelope(-180.0, -90.0, 180.0, 90.0)))
 ) TO '__OUTPUT_PARQUET__' (
     FORMAT PARQUET,
     COMPRESSION 'ZSTD',

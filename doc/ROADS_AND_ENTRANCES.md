@@ -138,7 +138,7 @@ Erfasst alle explizit kartierten Eingänge, Türen und Tore.
 3. **Räumliche Sortierung (Hilbert-Kurve):**
    - Zur Beschleunigung von DuckDB R-Tree Spatial Joins werden alle Layer räumlich geordnet:
      - `addresses` & `entrances`: `ORDER BY ST_Hilbert(geometry)`
-     - `roads`: `ORDER BY ST_Hilbert(ST_Centroid(geometry))`
+     - `roads`: `ORDER BY ST_Hilbert(ST_PointOnSurface(geometry))`
 4. **Parquet Footer Metadaten (`KV_METADATA`):**
    - Standardisierte Provenienz- und Lizenz-Metadaten (ODbL, Source, Dataset, Compiler, ISO Country Code, Export Timestamp) gemäß AGENTS.md Invarianten.
 
