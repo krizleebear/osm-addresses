@@ -671,5 +671,73 @@ class TestSpatialOptimizationInvariants(unittest.TestCase):
             self.assertIn(col, entr_sql, f"export_entrances.sql must project '{col}'")
 
 
+class TestPipelineMatrixAndReleaseParity(unittest.TestCase):
+    """Ensure convert matrix, canonical Geofabrik PBF URLs, and release patterns stay in sync."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.pipeline = read_file(PIPELINE_YAML)
+
+    def _full_convert_matrix_section(self):
+        start_marker = "${{ if eq(parameters.usOnly, false) }}:"
+        after_branch = self.pipeline.split(start_marker, 1)[1]
+        return after_branch.split("\n    steps:", 1)[0]
+
+    def _upload_assets_section(self):
+        after_job = self.pipeline.split("- job: upload_assets", 1)[1]
+        return after_job.split("\n    steps:", 1)[0]
+
+    def test_full_convert_matrix_has_no_duplicate_regions(self):
+        matrix_section = self._full_convert_matrix_section()
+        regions = re.findall(r"OSM_REGION:\s*'([^']+)'", matrix_section)
+        self.assertGreaterEqual(len(regions), 197)
+        self.assertEqual(
+            len(regions),
+            len(set(regions)),
+            "Duplicate OSM_REGION found inside convert matrix",
+        )
+
+    def test_all_pbf_urls_are_canonical_geofabrik_format(self):
+        all_urls = set(re.findall(r"https://download\.geofabrik\.de/[^\s'\"]+", self.pipeline))
+        pairs = re.findall(r"OSM_REGION:\s*'([^']+)'\s+PBF_URL:\s*'([^']+)'", self.pipeline)
+        self.assertGreaterEqual(len(pairs), 197)
+        self.assertEqual(
+            all_urls - {u for _, u in pairs},
+            set(),
+            "Found Geofabrik URL outside standard (OSM_REGION, PBF_URL) pairs",
+        )
+        for reg, url in pairs:
+            self.assertTrue(
+                url.startswith("https://download.geofabrik.de/"),
+                f"Invalid Geofabrik URL scheme/host for '{reg}': {url}",
+            )
+            expected_suffix = f"/{reg}/{reg}-latest.osm.pbf"
+            self.assertTrue(
+                url.endswith(expected_suffix),
+                f"Non-canonical PBF_URL for '{reg}' ('{url}'); expected suffix '{expected_suffix}'",
+            )
+
+    def test_convert_matrix_matches_release_upload_artifact_patterns(self):
+        matrix_section = self._full_convert_matrix_section()
+        triples = re.findall(
+            r"OSM_REGION:\s*'([^']+)'\s+PBF_URL:\s*'[^']+'\s+COUNTRY_CODE:\s*'([^']+)'",
+            matrix_section,
+        )
+        expected_patterns = {f"osm-parquet-{cc}-{reg}/**" for reg, cc in triples}
+
+        upload_section = self._upload_assets_section()
+        actual_patterns = re.findall(r"(osm-parquet-[A-Za-z0-9-]+/\*\*)", upload_section)
+        self.assertEqual(
+            len(actual_patterns),
+            len(set(actual_patterns)),
+            "Duplicate osm-parquet artifact pattern in upload_assets",
+        )
+        self.assertEqual(
+            expected_patterns,
+            set(actual_patterns),
+            "Mismatch between convert matrix entries and release upload_assets ARTIFACT_PATTERNS",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -13,6 +13,7 @@ from validate_parquet import (
     validate_roads_file,
     validate_entrances_file,
     validate_waterways_file,
+    ADDRESS_REQUIRED_COLUMNS,
     WATERWAY_REQUIRED_COLUMNS,
     REQUIRED_METADATA_KEYS,
 )
@@ -63,6 +64,54 @@ class TestValidateParquet(unittest.TestCase):
         self.assertEqual(len(res["issues"]), 0)
         self.assertEqual(len(res["warnings"]), 1)
         self.assertIn("0 waterways", res["warnings"][0])
+
+    @patch("validate_parquet.get_parquet_columns")
+    @patch("validate_parquet.get_parquet_metadata_keys")
+    @patch("validate_parquet.run_duckdb_query")
+    @patch("validate_parquet.os.path.getsize", return_value=1024)
+    @patch("validate_parquet.os.path.exists", return_value=True)
+    def test_empty_addresses_reports_warning_not_error(
+        self, mock_exists, mock_getsize, mock_query, mock_meta, mock_cols
+    ):
+        mock_cols.return_value = list(ADDRESS_REQUIRED_COLUMNS)
+        mock_meta.return_value = list(REQUIRED_METADATA_KEYS)
+        mock_query.return_value = [{
+            "total_rows": 0,
+            "way_count": 0,
+            "node_count": 0,
+            "relation_count": 0,
+            "null_id_count": 0,
+            "null_number_count": 0,
+        }]
+
+        res = validate_addresses_file("TK_tokelau.addresses.parquet")
+        self.assertEqual(res["status"], "WARN")
+        self.assertEqual(res["issues"], [])
+        self.assertEqual(len(res["warnings"]), 1)
+        self.assertIn("0 address rows", res["warnings"][0])
+
+    @patch("validate_parquet.get_parquet_columns")
+    @patch("validate_parquet.get_parquet_metadata_keys")
+    @patch("validate_parquet.run_duckdb_query")
+    @patch("validate_parquet.os.path.getsize", return_value=1024)
+    @patch("validate_parquet.os.path.exists", return_value=True)
+    def test_addresses_missing_building_ways_still_reports_error(
+        self, mock_exists, mock_getsize, mock_query, mock_meta, mock_cols
+    ):
+        mock_cols.return_value = list(ADDRESS_REQUIRED_COLUMNS)
+        mock_meta.return_value = list(REQUIRED_METADATA_KEYS)
+        mock_query.return_value = [{
+            "total_rows": 600,
+            "way_count": 0,
+            "node_count": 600,
+            "relation_count": 0,
+            "null_id_count": 0,
+            "null_number_count": 0,
+        }]
+
+        res = validate_addresses_file("DE_germany.addresses.parquet")
+        self.assertEqual(res["status"], "ERROR")
+        self.assertIn("POTENTIAL REGRESSION", res["issues"][0])
 
     @patch("validate_parquet.get_parquet_columns")
     @patch("validate_parquet.get_parquet_metadata_keys")

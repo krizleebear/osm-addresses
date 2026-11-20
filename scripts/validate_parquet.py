@@ -102,9 +102,10 @@ def get_parquet_metadata_keys(file_path):
 def validate_addresses_file(file_path):
     """Validate addresses.parquet file."""
     issues = []
+    warnings = []
     stats = {}
     if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
-        return {"file": file_path, "status": "ERROR", "issues": ["File missing or 0 bytes"], "stats": {}}
+        return {"file": file_path, "status": "ERROR", "issues": ["File missing or 0 bytes"], "warnings": [], "stats": {}}
 
     try:
         cols = get_parquet_columns(file_path)
@@ -138,7 +139,9 @@ def validate_addresses_file(file_path):
             null_ids = r.get("null_id_count", 0)
 
             if total == 0:
-                issues.append("Dataset is empty (0 address rows)")
+                warnings.append(
+                    "Dataset has 0 address rows (expected for remote atolls and micro-territories without addr:housenumber in OSM)"
+                )
             if null_ids > 0:
                 issues.append(f"Found {null_ids} addresses with NULL osm_id")
 
@@ -153,8 +156,8 @@ def validate_addresses_file(file_path):
     except Exception as exc:
         issues.append(f"Query error: {exc}")
 
-    status = "ERROR" if issues else "OK"
-    return {"file": file_path, "status": status, "issues": issues, "warnings": [], "stats": stats}
+    status = "ERROR" if issues else ("WARN" if warnings else "OK")
+    return {"file": file_path, "status": status, "issues": issues, "warnings": warnings, "stats": stats}
 
 
 def validate_roads_file(file_path):
