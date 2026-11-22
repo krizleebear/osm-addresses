@@ -155,7 +155,9 @@ jobs:
         | **\`number\`** | \`VARCHAR\` | House number (\`addr:housenumber\`) |
         | **\`postcode\`** | \`VARCHAR\` | Postal code (\`addr:postcode\`) |
         | **\`city\`** | \`VARCHAR\` | City / Municipality (\`addr:city\`) |
-        | **\`geometry\`** | \`GEOMETRY\` | Point geometry (WGS84 EPSG:4326, Hilbert-sorted) |
+        | **\`lon\`** | \`DOUBLE\` | Longitude (\`ST_X(geometry)\`) for Parquet row-group pushdown |
+        | **\`lat\`** | \`DOUBLE\` | Latitude (\`ST_Y(geometry)\`) for Parquet row-group pushdown |
+        | **\`geometry\`** | \`GEOMETRY('EPSG:4326')\` | Point geometry (WGS84 EPSG:4326, Hilbert-sorted) |
         | **\`osm_type\`** | \`VARCHAR\` | Source OSM element type (\`node\`, \`way\`, \`relation\`) |
         | **\`osm_id\`** | \`BIGINT\` | Source OSM element ID |
 
@@ -168,7 +170,11 @@ jobs:
         | **\`highway\`** | \`VARCHAR\` | Highway classification (\`residential\`, \`primary\`, \`service\`, etc.) |
         | **\`oneway\`** | \`VARCHAR\` | Normalized oneway flag (\`yes\`, \`no\`, \`-1\`) |
         | **\`service\`** | \`VARCHAR\` | Subtype for service roads (\`driveway\`, \`alley\`, etc.) |
-        | **\`geometry\`** | \`GEOMETRY\` | LineString geometry (WGS84 EPSG:4326, Hilbert-sorted) |
+        | **\`bbox_minx\`** | \`DOUBLE\` | Minimum longitude (\`ST_XMin(geometry)\`) for Parquet row-group pushdown |
+        | **\`bbox_miny\`** | \`DOUBLE\` | Minimum latitude (\`ST_YMin(geometry)\`) for Parquet row-group pushdown |
+        | **\`bbox_maxx\`** | \`DOUBLE\` | Maximum longitude (\`ST_XMax(geometry)\`) for Parquet row-group pushdown |
+        | **\`bbox_maxy\`** | \`DOUBLE\` | Maximum latitude (\`ST_YMax(geometry)\`) for Parquet row-group pushdown |
+        | **\`geometry\`** | \`GEOMETRY('EPSG:4326')\` | LineString geometry (WGS84 EPSG:4326, Hilbert-sorted) |
 
         #### 3. Entrances & Access Gates (\`<CC>_<region>.entrances.parquet\`)
         | Column | Type | Description |
@@ -181,7 +187,9 @@ jobs:
         | **\`barrier\`** | \`VARCHAR\` | Barrier tag value for gates/access points (\`gate\`, \`lift_gate\`) |
         | **\`street\`** | \`VARCHAR\` | Street name at entrance |
         | **\`housenumber\`** | \`VARCHAR\` | House number at entrance |
-        | **\`geometry\`** | \`GEOMETRY\` | Point geometry (WGS84 EPSG:4326, Hilbert-sorted) |
+        | **\`lon\`** | \`DOUBLE\` | Longitude (\`ST_X(geometry)\`) for Parquet row-group pushdown |
+        | **\`lat\`** | \`DOUBLE\` | Latitude (\`ST_Y(geometry)\`) for Parquet row-group pushdown |
+        | **\`geometry\`** | \`GEOMETRY('EPSG:4326')\` | Point geometry (WGS84 EPSG:4326, Hilbert-sorted) |
 
         #### 4. Linear Waterways (\`<CC>_<region>.waterways.parquet\`)
         | Column | Type | Description |
@@ -194,18 +202,22 @@ jobs:
         | **\`member_role\`** | \`VARCHAR\` | Role in parent relation (e.g. \`'main_stream'\`, \`'side_stream'\`) or \`NULL\` |
         | **\`alt_names\`** | \`MAP(VARCHAR, VARCHAR)\` | Localized & alternative names (\`en\`, \`de\`, \`alt_name\`, etc.) |
         | **\`tags\`** | \`MAP(VARCHAR, VARCHAR)\` | Complete raw OSM tags map (merged from way and parent relation) |
-        | **\`geometry\`** | \`GEOMETRY\` | LineString geometry (WGS84 EPSG:4326, Hilbert-sorted) |
+        | **\`bbox_minx\`** | \`DOUBLE\` | Minimum longitude (\`ST_XMin(geometry)\`) for Parquet row-group pushdown |
+        | **\`bbox_miny\`** | \`DOUBLE\` | Minimum latitude (\`ST_YMin(geometry)\`) for Parquet row-group pushdown |
+        | **\`bbox_maxx\`** | \`DOUBLE\` | Maximum longitude (\`ST_XMax(geometry)\`) for Parquet row-group pushdown |
+        | **\`bbox_maxy\`** | \`DOUBLE\` | Maximum latitude (\`ST_YMax(geometry)\`) for Parquet row-group pushdown |
+        | **\`geometry\`** | \`GEOMETRY('EPSG:4326')\` | LineString geometry (WGS84 EPSG:4326, Hilbert-sorted) |
 
         ### Download Assets
-        - **`<CC>_<region>.addresses.parquet`**: Address points ($ADDRESS_COUNT files)
-        - **`<CC>_<region>.roads.parquet`**: Drivable road centerlines ($ROAD_COUNT files, partitioned into `.part<N>.parquet` where raw size exceeds GitHub's 2 GiB limit)
-        - **`<CC>_<region>.entrances.parquet`**: Entrance nodes & gates ($ENTRANCE_COUNT files)
-        - **`<CC>_<region>.waterways.parquet`**: Linear waterways ($WATERWAY_COUNT files)
+        - **\`<CC>_<region>.addresses.parquet\`**: Address points ($ADDRESS_COUNT files)
+        - **\`<CC>_<region>.roads.parquet\`**: Drivable road centerlines ($ROAD_COUNT files, partitioned into \`.part<N>.parquet\` where raw size exceeds GitHub's 2 GiB limit)
+        - **\`<CC>_<region>.entrances.parquet\`**: Entrance nodes & gates ($ENTRANCE_COUNT files)
+        - **\`<CC>_<region>.waterways.parquet\`**: Linear waterways ($WATERWAY_COUNT files)
 
         Total GeoParquet assets in this release: **$PARQUET_COUNT**.
 
         ---
-        *Built with DuckDB spatial extension and ZSTD compression. Spatially indexed using Hilbert curve ordering.*
+        *Built with DuckDB spatial extension and ZSTD compression. Spatially indexed using Hilbert curve ordering with scalar coordinate/bbox pushdown columns.*
         EOF
 
         ls -lh release-assets/

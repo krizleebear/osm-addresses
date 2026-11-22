@@ -28,7 +28,7 @@ class TestSplitOversizedParquet(unittest.TestCase):
             "split_oversized_parquet.subprocess.check_output",
             side_effect=[
                 b'[{"null_id_count": 0}]',
-                b'[{"key": "source", "value": "OpenStreetMap"}]',
+                b'[{"key": "source", "value": "OpenStreetMap"}, {"key": "geo", "value": "{}"}]',
             ],
         ) as check_output, patch(
             "split_oversized_parquet.subprocess.check_call"
@@ -39,7 +39,10 @@ class TestSplitOversizedParquet(unittest.TestCase):
         self.assertEqual(check_output.call_count, 2)
         self.assertIn("WHERE osm_id IS NULL", check_output.call_args_list[0].args[0][3])
         self.assertNotIn("-dark-mode", check_output.call_args_list[0].args[0])
-        self.assertIn("parquet_kv_metadata", check_output.call_args_list[1].args[0][3])
+        kv_query = check_output.call_args_list[1].args[0][3]
+        self.assertIn("parquet_kv_metadata", kv_query)
+        self.assertIn("key::VARCHAR", kv_query)
+        self.assertIn("value::VARCHAR", kv_query)
         self.assertEqual(check_call.call_count, 3)
 
         for part_number, call in enumerate(check_call.call_args_list, start=1):
@@ -47,12 +50,16 @@ class TestSplitOversizedParquet(unittest.TestCase):
             self.assertEqual(command[:2], ["duckdb", "-c"])
             self.assertNotIn("-dark-mode", command)
             sql = command[2]
+            self.assertIn("LOAD spatial;", sql)
             self.assertNotIn("ntile(", sql)
             self.assertIn("hash(osm_type, osm_id) % 3", sql)
             self.assertIn(f"= {part_number - 1}", sql)
             self.assertIn(f"TO '{part_files[part_number - 1]}'", sql)
             self.assertIn("COMPRESSION 'ZSTD'", sql)
+            self.assertIn("ROW_GROUP_SIZE 50000", sql)
+            self.assertIn("GEOPARQUET_VERSION 'BOTH'", sql)
             self.assertIn("KV_METADATA {'source': 'OpenStreetMap'}", sql)
+            self.assertNotIn("'geo':", sql)
 
         remove.assert_called_once_with(source_file)
 

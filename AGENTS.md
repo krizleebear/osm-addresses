@@ -20,7 +20,7 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
 ## Pipeline Architecture & Conventions
 
 1. **Build & Release Pipeline (`azure-pipelines.yml` / `addresses-parquet-pipeline`):**
-   - 169 region matrix definitions following Geofabrik hierarchy across 7 continents.
+   - 197 region matrix definitions following Geofabrik hierarchy across 7 continents.
    - Includes single-threaded `warmup` stage that verifies image availability: pulls from `ghcr.io` (primary) with 3 retries, then falls back to `mirror.gcr.io` if GHCR is unavailable. Fails explicitly if both registries fail.
    - Publishes individual per-region GeoParquet artifacts (`addresses-parquet-$(CC)-$(REGION)`) and pre-filtered address PBF artifacts (`addresses-pbf-$(CC)-$(REGION)`).
    - Features integrated `release` stage controlled via parameter `publishGitHubRelease` (default `true`), which creates the release record and uploads GeoParquet artifacts in parallel matrix jobs partitioned by geographical continents (`Europe`, `North America`, `South & Central America`, `Asia`, `Africa`, `Oceania & Russia`) directly to GitHub Releases using service connection `3c34db30-d57b-42e2-a970-857bd932c6c0`.
@@ -104,4 +104,4 @@ To ensure consistent pipeline execution, geographical coverage, and clean Git wo
     - **Scalar BBox / Coordinate Columns**:
       - Point datasets (`addresses`, `entrances`) must project scalar `lon = ST_X(geom)` and `lat = ST_Y(geom)` (`DOUBLE`).
       - Line/Polygon datasets (`roads`, `waterways`) must project `bbox_minx = ST_XMin(geom)`, `bbox_miny = ST_YMin(geom)`, `bbox_maxx = ST_XMax(geom)`, and `bbox_maxy = ST_YMax(geom)` (`DOUBLE`).
-    - **Row Group Sizing**: All `COPY ... TO` statements must specify `ROW_GROUP_SIZE 50000` to ensure tight spatial clustering per block without compromising ZSTD compression.
+    - **Row Group Sizing & Typed Geometry (`GEOPARQUET_VERSION 'BOTH'`):** All `COPY ... TO` statements must specify `ROW_GROUP_SIZE 50000` (for tight spatial clustering per block without compromising ZSTD compression) and `GEOPARQUET_VERSION 'BOTH'` so Parquet native `GeometryType` is written alongside GeoParquet 1.0 `geo` metadata and 0-row files retain `GEOMETRY('EPSG:4326')` instead of falling back to `BLOB`.

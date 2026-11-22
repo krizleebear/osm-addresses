@@ -636,6 +636,16 @@ class TestSpatialOptimizationInvariants(unittest.TestCase):
                 f"{basename} must specify 'ROW_GROUP_SIZE 50000' for optimal spatial pruning",
             )
 
+    def test_sql_templates_specify_geoparquet_version_both(self):
+        for template_path in SQL_TEMPLATES:
+            basename = os.path.basename(template_path)
+            content = read_file(template_path)
+            self.assertIn(
+                "GEOPARQUET_VERSION 'BOTH'",
+                content,
+                f"{basename} must specify \"GEOPARQUET_VERSION 'BOTH'\" so 0-row files retain typed GEOMETRY",
+            )
+
     def test_all_sql_templates_use_hilbert_sorting(self):
         for template_path in SQL_TEMPLATES:
             basename = os.path.basename(template_path)
@@ -737,6 +747,42 @@ class TestPipelineMatrixAndReleaseParity(unittest.TestCase):
             set(actual_patterns),
             "Mismatch between convert matrix entries and release upload_assets ARTIFACT_PATTERNS",
         )
+
+    def test_release_notes_match_matrix_region_count_and_document_pushdown_columns(self):
+        regions = re.findall(r"OSM_REGION:\s*'([^']+)'", self._full_convert_matrix_section())
+        pipeline_notes = self.pipeline.split("cat <<EOF > release-notes.md", 1)[1].split(
+            "\n          EOF", 1
+        )[0]
+        release_notes = read_file(RELEASE_PIPELINE_YAML).split(
+            "cat <<EOF > release-notes.md", 1
+        )[1].split("\n        EOF", 1)[0]
+
+        self.assertIn(
+            f"{len(regions)} countries and territories",
+            pipeline_notes,
+            "azure-pipelines.yml release notes must match the convert matrix region count",
+        )
+        self.assertNotIn("169 countries", pipeline_notes)
+        self.assertNotIn("Over 700 GeoParquet", pipeline_notes)
+
+        for label, notes in (
+            ("azure-pipelines.yml", pipeline_notes),
+            ("azure-pipelines-release.yml", release_notes),
+        ):
+            for token in (
+                "lon",
+                "lat",
+                "bbox_minx",
+                "bbox_miny",
+                "bbox_maxx",
+                "bbox_maxy",
+                "GEOMETRY('EPSG:4326')",
+            ):
+                self.assertIn(
+                    token,
+                    notes,
+                    f"{label} release notes must document '{token}'",
+                )
 
 
 if __name__ == "__main__":

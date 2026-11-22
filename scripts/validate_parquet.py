@@ -85,11 +85,31 @@ def run_duckdb_query(sql):
         raise RuntimeError(f"Failed to parse DuckDB JSON output: {res.stdout}") from exc
 
 
-def get_parquet_columns(file_path):
-    """Return list of column names in parquet file."""
+def get_parquet_column_types(file_path):
+    """Return mapping of column_name -> column_type in parquet file."""
     sql = f"DESCRIBE SELECT * FROM read_parquet('{file_path}');"
     rows = run_duckdb_query(sql)
-    return [r["column_name"] for r in rows if "column_name" in r]
+    return {
+        r["column_name"]: r["column_type"]
+        for r in rows
+        if "column_name" in r and "column_type" in r
+    }
+
+
+def get_parquet_columns(file_path):
+    """Return list of column names in parquet file."""
+    return list(get_parquet_column_types(file_path).keys())
+
+
+def validate_geometry_column_type(col_types, issues):
+    """Verify the geometry column carries a typed GEOMETRY schema, even on 0-row files."""
+    if "geometry" not in col_types:
+        return
+    geom_type = str(col_types["geometry"])
+    if not geom_type.upper().startswith("GEOMETRY"):
+        issues.append(
+            f"Column 'geometry' has type '{geom_type}', expected GEOMETRY (check GEOPARQUET_VERSION 'BOTH')"
+        )
 
 
 def get_parquet_metadata_keys(file_path):
@@ -108,11 +128,13 @@ def validate_addresses_file(file_path):
         return {"file": file_path, "status": "ERROR", "issues": ["File missing or 0 bytes"], "warnings": [], "stats": {}}
 
     try:
-        cols = get_parquet_columns(file_path)
+        col_types = get_parquet_column_types(file_path)
+        cols = list(col_types.keys())
         stats["columns"] = cols
         for req_col in ADDRESS_REQUIRED_COLUMNS:
             if req_col not in cols:
                 issues.append(f"Missing required column '{req_col}'")
+        validate_geometry_column_type(col_types, issues)
 
         meta_keys = get_parquet_metadata_keys(file_path)
         missing_meta = [k for k in REQUIRED_METADATA_KEYS if k not in meta_keys]
@@ -168,11 +190,13 @@ def validate_roads_file(file_path):
         return {"file": file_path, "status": "ERROR", "issues": ["File missing or 0 bytes"], "warnings": [], "stats": {}}
 
     try:
-        cols = get_parquet_columns(file_path)
+        col_types = get_parquet_column_types(file_path)
+        cols = list(col_types.keys())
         stats["columns"] = cols
         for req_col in ROAD_REQUIRED_COLUMNS:
             if req_col not in cols:
                 issues.append(f"Missing required column '{req_col}'")
+        validate_geometry_column_type(col_types, issues)
 
         meta_keys = get_parquet_metadata_keys(file_path)
         missing_meta = [k for k in REQUIRED_METADATA_KEYS if k not in meta_keys]
@@ -224,11 +248,13 @@ def validate_entrances_file(file_path):
         return {"file": file_path, "status": "ERROR", "issues": ["File missing or 0 bytes"], "warnings": [], "stats": {}}
 
     try:
-        cols = get_parquet_columns(file_path)
+        col_types = get_parquet_column_types(file_path)
+        cols = list(col_types.keys())
         stats["columns"] = cols
         for req_col in ENTRANCE_REQUIRED_COLUMNS:
             if req_col not in cols:
                 issues.append(f"Missing required column '{req_col}'")
+        validate_geometry_column_type(col_types, issues)
 
         meta_keys = get_parquet_metadata_keys(file_path)
         missing_meta = [k for k in REQUIRED_METADATA_KEYS if k not in meta_keys]
@@ -267,11 +293,13 @@ def validate_waterways_file(file_path):
         return {"file": file_path, "status": "ERROR", "issues": ["File missing or 0 bytes"], "warnings": [], "stats": {}}
 
     try:
-        cols = get_parquet_columns(file_path)
+        col_types = get_parquet_column_types(file_path)
+        cols = list(col_types.keys())
         stats["columns"] = cols
         for req_col in WATERWAY_REQUIRED_COLUMNS:
             if req_col not in cols:
                 issues.append(f"Missing required column '{req_col}'")
+        validate_geometry_column_type(col_types, issues)
 
         meta_keys = get_parquet_metadata_keys(file_path)
         missing_meta = [k for k in REQUIRED_METADATA_KEYS if k not in meta_keys]

@@ -30,16 +30,16 @@ def run_duckdb_json_query(sql):
 
 
 def get_kv_metadata(file_path):
-    """Extract KV_METADATA from a parquet file using DuckDB."""
+    """Extract KV_METADATA from a parquet file using DuckDB, excluding 'geo' (regenerated per part)."""
     try:
         rows = run_duckdb_json_query(
-            f'SELECT key, value FROM parquet_kv_metadata("{file_path}")'
+            f'SELECT key::VARCHAR AS key, value::VARCHAR AS value FROM parquet_kv_metadata("{file_path}")'
         )
         metadata = {}
         for row in rows:
             key = row.get("key")
             value = row.get("value")
-            if key is not None and value is not None:
+            if key is not None and value is not None and key != "geo":
                 metadata[key] = value
         return metadata
     except Exception as error:
@@ -84,11 +84,12 @@ def split_file(file_path, max_size_mb):
     for part in range(1, num_parts + 1):
         part_file = os.path.join(dir_name, f"{stem}.part{part}.parquet")
         bucket = part - 1
-        sql = f"""COPY (
+        sql = f"""LOAD spatial;
+        COPY (
             SELECT *
             FROM read_parquet('{file_path}')
             WHERE hash(osm_type, osm_id) % {num_parts} = {bucket}
-        ) TO '{part_file}' (FORMAT PARQUET, COMPRESSION 'ZSTD'{kv_clause});"""
+        ) TO '{part_file}' (FORMAT PARQUET, COMPRESSION 'ZSTD', ROW_GROUP_SIZE 50000, GEOPARQUET_VERSION 'BOTH'{kv_clause});"""
 
         print(f"[INFO] Generating {part_file} (part {part}/{num_parts})...")
         subprocess.check_call(["duckdb", "-c", sql])

@@ -7,7 +7,7 @@ Global address dataset extracted from OpenStreetMap, published as **GeoParquet**
 Each file contains all address-tagged features (`addr:housenumber` + `addr:street`) for one region:
 
 - **Points**: OSM nodes with address tags (direct coordinates)
-- **Buildings & Polygons**: OSM ways and multipolygons with address tags (centroid used as point geometry)
+- **Buildings & Polygons**: OSM ways and multipolygons with address tags (`ST_PointOnSurface` used as point geometry)
 
 ### Schema
 
@@ -17,6 +17,8 @@ Each file contains all address-tagged features (`addr:housenumber` + `addr:stree
 | `number` | `varchar` | `addr:housenumber` |
 | `postcode` | `varchar` | `addr:postcode` |
 | `city` | `varchar` | `addr:city` |
+| `lon` | `double` | Longitude (`ST_X(geometry)`) for row-group pushdown |
+| `lat` | `double` | Latitude (`ST_Y(geometry)`) for row-group pushdown |
 | `geometry` | `geometry('epsg:4326')` | Point geometry (WGS84 EPSG:4326) |
 | `osm_type` | `varchar` | Source OSM element type (`node`, `way`, `relation`) |
 | `osm_id` | `int64` | Source OSM element ID |
@@ -53,7 +55,7 @@ Data is produced and published by two Azure DevOps pipelines:
 
 ## Coverage
 
-**Global Coverage**: 169 region definitions spanning Africa, Asia, Europe, Oceania, Central America, North America, and South America matching the [osm-polygons](https://github.com/krizleebear/osm-polygons) dataset.
+**Global Coverage**: 197 region definitions spanning Africa, Asia, Europe, Oceania, Central America, North America, and South America matching the [osm-polygons](https://github.com/krizleebear/osm-polygons) dataset.
 
 ## Future Ideas & Roadmap
 

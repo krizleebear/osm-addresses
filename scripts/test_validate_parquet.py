@@ -14,9 +14,17 @@ from validate_parquet import (
     validate_entrances_file,
     validate_waterways_file,
     ADDRESS_REQUIRED_COLUMNS,
+    ROAD_REQUIRED_COLUMNS,
     WATERWAY_REQUIRED_COLUMNS,
     REQUIRED_METADATA_KEYS,
 )
+
+
+def typed_columns(required_cols, geom_type="GEOMETRY('EPSG:4326')"):
+    return {
+        col: (geom_type if col == "geometry" else "VARCHAR")
+        for col in required_cols
+    }
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AT_DIR = os.path.join(REPO_ROOT, "osm-parquet-AT-austria")
@@ -37,7 +45,7 @@ class TestValidateParquet(unittest.TestCase):
         self.assertEqual(res_waterways["status"], "ERROR")
         self.assertIn("File missing or 0 bytes", res_waterways["issues"])
 
-    @patch("validate_parquet.get_parquet_columns")
+    @patch("validate_parquet.get_parquet_column_types")
     @patch("validate_parquet.get_parquet_metadata_keys")
     @patch("validate_parquet.run_duckdb_query")
     @patch("validate_parquet.os.path.getsize", return_value=1024)
@@ -45,7 +53,7 @@ class TestValidateParquet(unittest.TestCase):
     def test_empty_waterways_reports_warning_not_error(
         self, mock_exists, mock_getsize, mock_query, mock_meta, mock_cols
     ):
-        mock_cols.return_value = list(WATERWAY_REQUIRED_COLUMNS)
+        mock_cols.return_value = typed_columns(WATERWAY_REQUIRED_COLUMNS)
         mock_meta.return_value = list(REQUIRED_METADATA_KEYS)
         mock_query.return_value = [{
             "total_rows": 0,
@@ -65,7 +73,7 @@ class TestValidateParquet(unittest.TestCase):
         self.assertEqual(len(res["warnings"]), 1)
         self.assertIn("0 waterways", res["warnings"][0])
 
-    @patch("validate_parquet.get_parquet_columns")
+    @patch("validate_parquet.get_parquet_column_types")
     @patch("validate_parquet.get_parquet_metadata_keys")
     @patch("validate_parquet.run_duckdb_query")
     @patch("validate_parquet.os.path.getsize", return_value=1024)
@@ -73,7 +81,7 @@ class TestValidateParquet(unittest.TestCase):
     def test_empty_addresses_reports_warning_not_error(
         self, mock_exists, mock_getsize, mock_query, mock_meta, mock_cols
     ):
-        mock_cols.return_value = list(ADDRESS_REQUIRED_COLUMNS)
+        mock_cols.return_value = typed_columns(ADDRESS_REQUIRED_COLUMNS)
         mock_meta.return_value = list(REQUIRED_METADATA_KEYS)
         mock_query.return_value = [{
             "total_rows": 0,
@@ -90,7 +98,7 @@ class TestValidateParquet(unittest.TestCase):
         self.assertEqual(len(res["warnings"]), 1)
         self.assertIn("0 address rows", res["warnings"][0])
 
-    @patch("validate_parquet.get_parquet_columns")
+    @patch("validate_parquet.get_parquet_column_types")
     @patch("validate_parquet.get_parquet_metadata_keys")
     @patch("validate_parquet.run_duckdb_query")
     @patch("validate_parquet.os.path.getsize", return_value=1024)
@@ -98,7 +106,7 @@ class TestValidateParquet(unittest.TestCase):
     def test_addresses_missing_building_ways_still_reports_error(
         self, mock_exists, mock_getsize, mock_query, mock_meta, mock_cols
     ):
-        mock_cols.return_value = list(ADDRESS_REQUIRED_COLUMNS)
+        mock_cols.return_value = typed_columns(ADDRESS_REQUIRED_COLUMNS)
         mock_meta.return_value = list(REQUIRED_METADATA_KEYS)
         mock_query.return_value = [{
             "total_rows": 600,
@@ -113,7 +121,7 @@ class TestValidateParquet(unittest.TestCase):
         self.assertEqual(res["status"], "ERROR")
         self.assertIn("POTENTIAL REGRESSION", res["issues"][0])
 
-    @patch("validate_parquet.get_parquet_columns")
+    @patch("validate_parquet.get_parquet_column_types")
     @patch("validate_parquet.get_parquet_metadata_keys")
     @patch("validate_parquet.run_duckdb_query")
     @patch("validate_parquet.os.path.getsize", return_value=1024)
@@ -121,7 +129,7 @@ class TestValidateParquet(unittest.TestCase):
     def test_waterways_with_unnamed_reports_error(
         self, mock_exists, mock_getsize, mock_query, mock_meta, mock_cols
     ):
-        mock_cols.return_value = list(WATERWAY_REQUIRED_COLUMNS)
+        mock_cols.return_value = typed_columns(WATERWAY_REQUIRED_COLUMNS)
         mock_meta.return_value = list(REQUIRED_METADATA_KEYS)
         mock_query.return_value = [{
             "total_rows": 10,
@@ -139,7 +147,7 @@ class TestValidateParquet(unittest.TestCase):
         self.assertEqual(res["status"], "ERROR")
         self.assertIn("unnamed waterways", res["issues"][0])
 
-    @patch("validate_parquet.get_parquet_columns")
+    @patch("validate_parquet.get_parquet_column_types")
     @patch("validate_parquet.get_parquet_metadata_keys")
     @patch("validate_parquet.run_duckdb_query")
     @patch("validate_parquet.os.path.getsize", return_value=1024)
@@ -147,7 +155,7 @@ class TestValidateParquet(unittest.TestCase):
     def test_waterways_large_dataset_without_relations_reports_warning(
         self, mock_exists, mock_getsize, mock_query, mock_meta, mock_cols
     ):
-        mock_cols.return_value = list(WATERWAY_REQUIRED_COLUMNS)
+        mock_cols.return_value = typed_columns(WATERWAY_REQUIRED_COLUMNS)
         mock_meta.return_value = list(REQUIRED_METADATA_KEYS)
         mock_query.return_value = [{
             "total_rows": 1500,
@@ -166,6 +174,57 @@ class TestValidateParquet(unittest.TestCase):
         self.assertEqual(len(res["issues"]), 0)
         self.assertEqual(len(res["warnings"]), 1)
         self.assertIn("0 waterways with relation membership", res["warnings"][0])
+
+    @patch("validate_parquet.get_parquet_column_types")
+    @patch("validate_parquet.get_parquet_metadata_keys")
+    @patch("validate_parquet.run_duckdb_query")
+    @patch("validate_parquet.os.path.getsize", return_value=1024)
+    @patch("validate_parquet.os.path.exists", return_value=True)
+    def test_blob_geometry_column_reports_error(
+        self, mock_exists, mock_getsize, mock_query, mock_meta, mock_cols
+    ):
+        mock_meta.return_value = list(REQUIRED_METADATA_KEYS)
+
+        mock_cols.return_value = typed_columns(ADDRESS_REQUIRED_COLUMNS, geom_type="BLOB")
+        mock_query.return_value = [{
+            "total_rows": 0,
+            "way_count": 0,
+            "node_count": 0,
+            "relation_count": 0,
+            "null_id_count": 0,
+            "null_number_count": 0,
+        }]
+        res_addr = validate_addresses_file("NR_nauru.addresses.parquet")
+        self.assertEqual(res_addr["status"], "ERROR")
+        self.assertIn("Column 'geometry' has type 'BLOB', expected GEOMETRY", res_addr["issues"][0])
+
+        mock_cols.return_value = typed_columns(WATERWAY_REQUIRED_COLUMNS, geom_type="BLOB")
+        mock_query.return_value = [{
+            "total_rows": 0,
+            "null_id_count": 0,
+            "min_osm_id": None,
+            "max_osm_id": None,
+            "unnamed_count": 0,
+            "valid_waterway_count": 0,
+            "in_relation_count": 0,
+            "with_alt_names_count": 0,
+            "with_tags_count": 0,
+        }]
+        res_ww = validate_waterways_file("MC_monaco.waterways.parquet")
+        self.assertEqual(res_ww["status"], "ERROR")
+        self.assertIn("Column 'geometry' has type 'BLOB', expected GEOMETRY", res_ww["issues"][0])
+
+        mock_cols.return_value = typed_columns(ROAD_REQUIRED_COLUMNS, geom_type="BLOB")
+        mock_query.return_value = [{
+            "total_rows": 100,
+            "null_id_count": 0,
+            "min_osm_id": 100,
+            "max_osm_id": 200,
+            "named_roads_count": 80,
+        }]
+        res_roads = validate_roads_file("DE_germany.roads.part1.parquet")
+        self.assertEqual(res_roads["status"], "ERROR")
+        self.assertIn("Column 'geometry' has type 'BLOB', expected GEOMETRY", res_roads["issues"][0])
 
     @unittest.skipUnless(os.path.exists(AT_ADDRESSES), "AT addresses fixture not present")
     def test_austria_addresses_validation(self):

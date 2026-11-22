@@ -64,6 +64,7 @@ COPY (
     FORMAT PARQUET,
     COMPRESSION 'ZSTD',
     ROW_GROUP_SIZE 50000,
+    GEOPARQUET_VERSION 'BOTH',
     KV_METADATA {
         'source': 'OpenStreetMap',
         'origin': 'OpenStreetMap (https://www.openstreetmap.org)',
