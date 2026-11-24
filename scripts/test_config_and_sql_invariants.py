@@ -681,6 +681,33 @@ class TestSpatialOptimizationInvariants(unittest.TestCase):
             self.assertIn(col, entr_sql, f"export_entrances.sql must project '{col}'")
 
 
+DERIVED_COMPOSITE_REGIONS = frozenset({
+    "guernsey",
+    "jersey",
+    "american-samoa",
+    "guam",
+    "northern-mariana-islands",
+    "trinidad-and-tobago",
+    "barbados",
+    "antigua-and-barbuda",
+    "dominica",
+    "grenada",
+    "saint-kitts-and-nevis",
+    "saint-lucia",
+    "saint-vincent-and-the-grenadines",
+    "aruba",
+    "curacao",
+    "sint-maarten",
+    "saint-martin",
+    "saint-barthelemy",
+    "cayman-islands",
+    "turks-and-caicos-islands",
+    "british-virgin-islands",
+    "anguilla",
+    "montserrat",
+})
+
+
 class TestPipelineMatrixAndReleaseParity(unittest.TestCase):
     """Ensure convert matrix, canonical Geofabrik PBF URLs, and release patterns stay in sync."""
 
@@ -700,7 +727,7 @@ class TestPipelineMatrixAndReleaseParity(unittest.TestCase):
     def test_full_convert_matrix_has_no_duplicate_regions(self):
         matrix_section = self._full_convert_matrix_section()
         regions = re.findall(r"OSM_REGION:\s*'([^']+)'", matrix_section)
-        self.assertGreaterEqual(len(regions), 197)
+        self.assertGreaterEqual(len(regions), 220)
         self.assertEqual(
             len(regions),
             len(set(regions)),
@@ -709,14 +736,26 @@ class TestPipelineMatrixAndReleaseParity(unittest.TestCase):
 
     def test_all_pbf_urls_are_canonical_geofabrik_format(self):
         all_urls = set(re.findall(r"https://download\.geofabrik\.de/[^\s'\"]+", self.pipeline))
-        pairs = re.findall(r"OSM_REGION:\s*'([^']+)'\s+PBF_URL:\s*'([^']+)'", self.pipeline)
-        self.assertGreaterEqual(len(pairs), 197)
+        pairs = re.findall(r"OSM_REGION:\s*'([^']+)'\s+PBF_URL:\s*'([^']*)'", self.pipeline)
+        self.assertGreaterEqual(len(pairs), 220)
         self.assertEqual(
-            all_urls - {u for _, u in pairs},
+            all_urls - {u for _, u in pairs if u},
             set(),
             "Found Geofabrik URL outside standard (OSM_REGION, PBF_URL) pairs",
         )
         for reg, url in pairs:
+            if url == "":
+                self.assertIn(
+                    reg,
+                    DERIVED_COMPOSITE_REGIONS,
+                    f"Empty PBF_URL is only allowed for derived composite regions, got '{reg}'",
+                )
+                continue
+            self.assertNotIn(
+                reg,
+                DERIVED_COMPOSITE_REGIONS,
+                f"Derived composite region '{reg}' must have empty PBF_URL '', got '{url}'",
+            )
             self.assertTrue(
                 url.startswith("https://download.geofabrik.de/"),
                 f"Invalid Geofabrik URL scheme/host for '{reg}': {url}",
@@ -730,7 +769,7 @@ class TestPipelineMatrixAndReleaseParity(unittest.TestCase):
     def test_convert_matrix_matches_release_upload_artifact_patterns(self):
         matrix_section = self._full_convert_matrix_section()
         triples = re.findall(
-            r"OSM_REGION:\s*'([^']+)'\s+PBF_URL:\s*'[^']+'\s+COUNTRY_CODE:\s*'([^']+)'",
+            r"OSM_REGION:\s*'([^']+)'\s+PBF_URL:\s*'[^']*'\s+COUNTRY_CODE:\s*'([^']+)'",
             matrix_section,
         )
         expected_patterns = {f"osm-parquet-{cc}-{reg}/**" for reg, cc in triples}

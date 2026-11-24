@@ -346,6 +346,14 @@ stages:
             OSM_REGION: 'isle-of-man'
             PBF_URL: 'https://download.geofabrik.de/europe/isle-of-man/isle-of-man-latest.osm.pbf'
             COUNTRY_CODE: 'IM'
+          guernsey:
+            OSM_REGION: 'guernsey'
+            PBF_URL: ''
+            COUNTRY_CODE: 'GG'
+          jersey:
+            OSM_REGION: 'jersey'
+            PBF_URL: ''
+            COUNTRY_CODE: 'JE'
           kosovo:
             OSM_REGION: 'kosovo'
             PBF_URL: 'https://download.geofabrik.de/europe/kosovo/kosovo-latest.osm.pbf'
@@ -860,6 +868,18 @@ stages:
             OSM_REGION: 'pitcairn-islands'
             PBF_URL: 'https://download.geofabrik.de/australia-oceania/pitcairn-islands/pitcairn-islands-latest.osm.pbf'
             COUNTRY_CODE: 'PN'
+          american-samoa:
+            OSM_REGION: 'american-samoa'
+            PBF_URL: ''
+            COUNTRY_CODE: 'AS'
+          guam:
+            OSM_REGION: 'guam'
+            PBF_URL: ''
+            COUNTRY_CODE: 'GU'
+          northern-mariana-islands:
+            OSM_REGION: 'northern-mariana-islands'
+            PBF_URL: ''
+            COUNTRY_CODE: 'MP'
           polynesie-francaise:
             OSM_REGION: 'polynesie-francaise'
             PBF_URL: 'https://download.geofabrik.de/australia-oceania/polynesie-francaise/polynesie-francaise-latest.osm.pbf'
@@ -928,6 +948,78 @@ stages:
             OSM_REGION: 'jamaica'
             PBF_URL: 'https://download.geofabrik.de/central-america/jamaica/jamaica-latest.osm.pbf'
             COUNTRY_CODE: 'JM'
+          anguilla:
+            OSM_REGION: 'anguilla'
+            PBF_URL: ''
+            COUNTRY_CODE: 'AI'
+          antigua-and-barbuda:
+            OSM_REGION: 'antigua-and-barbuda'
+            PBF_URL: ''
+            COUNTRY_CODE: 'AG'
+          aruba:
+            OSM_REGION: 'aruba'
+            PBF_URL: ''
+            COUNTRY_CODE: 'AW'
+          barbados:
+            OSM_REGION: 'barbados'
+            PBF_URL: ''
+            COUNTRY_CODE: 'BB'
+          british-virgin-islands:
+            OSM_REGION: 'british-virgin-islands'
+            PBF_URL: ''
+            COUNTRY_CODE: 'VG'
+          cayman-islands:
+            OSM_REGION: 'cayman-islands'
+            PBF_URL: ''
+            COUNTRY_CODE: 'KY'
+          curacao:
+            OSM_REGION: 'curacao'
+            PBF_URL: ''
+            COUNTRY_CODE: 'CW'
+          dominica:
+            OSM_REGION: 'dominica'
+            PBF_URL: ''
+            COUNTRY_CODE: 'DM'
+          grenada:
+            OSM_REGION: 'grenada'
+            PBF_URL: ''
+            COUNTRY_CODE: 'GD'
+          montserrat:
+            OSM_REGION: 'montserrat'
+            PBF_URL: ''
+            COUNTRY_CODE: 'MS'
+          saint-barthelemy:
+            OSM_REGION: 'saint-barthelemy'
+            PBF_URL: ''
+            COUNTRY_CODE: 'BL'
+          saint-kitts-and-nevis:
+            OSM_REGION: 'saint-kitts-and-nevis'
+            PBF_URL: ''
+            COUNTRY_CODE: 'KN'
+          saint-lucia:
+            OSM_REGION: 'saint-lucia'
+            PBF_URL: ''
+            COUNTRY_CODE: 'LC'
+          saint-martin:
+            OSM_REGION: 'saint-martin'
+            PBF_URL: ''
+            COUNTRY_CODE: 'MF'
+          saint-vincent-and-the-grenadines:
+            OSM_REGION: 'saint-vincent-and-the-grenadines'
+            PBF_URL: ''
+            COUNTRY_CODE: 'VC'
+          sint-maarten:
+            OSM_REGION: 'sint-maarten'
+            PBF_URL: ''
+            COUNTRY_CODE: 'SX'
+          trinidad-and-tobago:
+            OSM_REGION: 'trinidad-and-tobago'
+            PBF_URL: ''
+            COUNTRY_CODE: 'TT'
+          turks-and-caicos-islands:
+            OSM_REGION: 'turks-and-caicos-islands'
+            PBF_URL: ''
+            COUNTRY_CODE: 'TC'
           nicaragua:
             OSM_REGION: 'nicaragua'
             PBF_URL: 'https://download.geofabrik.de/central-america/nicaragua/nicaragua-latest.osm.pbf'
@@ -1361,7 +1453,7 @@ stages:
           | **\`geometry\`** | \`GEOMETRY('EPSG:4326')\` | LineString geometry (WGS84 EPSG:4326, Hilbert-sorted) |
 
           ### Download Assets
-          Over 780 GeoParquet datasets covering 197 countries and territories worldwide:
+          Over 870 GeoParquet datasets covering 220 countries and territories worldwide:
           - **\`<CC>_<region>.addresses.parquet\`**: Address points
           - **\`<CC>_<region>.roads.parquet\`**: Drivable road centerlines (partitioned into \`.part<N>.parquet\` where raw size exceeds GitHub's 2 GiB limit)
           - **\`<CC>_<region>.entrances.parquet\`**: Entrance nodes & gates
@@ -1433,6 +1525,7 @@ stages:
             osm-parquet-GE-georgia/**
             osm-parquet-GF-guyane/**
             osm-parquet-GP-guadeloupe/**
+            osm-parquet-GG-guernsey/**
             osm-parquet-GR-greece/**
             osm-parquet-HR-croatia/**
             osm-parquet-HU-hungary/**
@@ -1440,6 +1533,7 @@ stages:
             osm-parquet-IM-isle-of-man/**
             osm-parquet-IS-iceland/**
             osm-parquet-IT-italy/**
+            osm-parquet-JE-jersey/**
             osm-parquet-LI-liechtenstein/**
             osm-parquet-LT-lithuania/**
             osm-parquet-LU-luxembourg/**
@@ -1485,19 +1579,37 @@ stages:
             osm-parquet-CL-chile/**
             osm-parquet-CO-colombia/**
             osm-parquet-CR-costa-rica/**
+            osm-parquet-AG-antigua-and-barbuda/**
+            osm-parquet-AI-anguilla/**
+            osm-parquet-AW-aruba/**
+            osm-parquet-BB-barbados/**
+            osm-parquet-BL-saint-barthelemy/**
             osm-parquet-CU-cuba/**
+            osm-parquet-CW-curacao/**
+            osm-parquet-DM-dominica/**
             osm-parquet-EC-ecuador/**
+            osm-parquet-GD-grenada/**
             osm-parquet-GT-guatemala/**
             osm-parquet-GY-guyana/**
             osm-parquet-HN-honduras/**
             osm-parquet-HT-haiti-and-domrep/**
             osm-parquet-JM-jamaica/**
+            osm-parquet-KN-saint-kitts-and-nevis/**
+            osm-parquet-KY-cayman-islands/**
+            osm-parquet-LC-saint-lucia/**
+            osm-parquet-MF-saint-martin/**
+            osm-parquet-MS-montserrat/**
             osm-parquet-NI-nicaragua/**
             osm-parquet-PA-panama/**
             osm-parquet-PE-peru/**
             osm-parquet-PY-paraguay/**
             osm-parquet-SR-suriname/**
             osm-parquet-SV-el-salvador/**
+            osm-parquet-SX-sint-maarten/**
+            osm-parquet-TC-turks-and-caicos-islands/**
+            osm-parquet-TT-trinidad-and-tobago/**
+            osm-parquet-VC-saint-vincent-and-the-grenadines/**
+            osm-parquet-VG-british-virgin-islands/**
             osm-parquet-UY-uruguay/**
             osm-parquet-VE-venezuela/**
         asia:
@@ -1609,6 +1721,9 @@ stages:
             osm-parquet-KI-kiribati/**
             osm-parquet-MH-marshall-islands/**
             osm-parquet-NC-new-caledonia/**
+            osm-parquet-AS-american-samoa/**
+            osm-parquet-GU-guam/**
+            osm-parquet-MP-northern-mariana-islands/**
             osm-parquet-NR-nauru/**
             osm-parquet-NU-niue/**
             osm-parquet-NZ-new-zealand/**
